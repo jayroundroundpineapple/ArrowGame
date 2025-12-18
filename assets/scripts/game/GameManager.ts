@@ -21,6 +21,7 @@ export class GameManager {
 
     // 箭头路径相关
     private arrowPaths: { x: number, y: number }[][] = []; // 箭头路径数组
+    private pathLeftMap: boolean[] = []; // 记录每条路径是否已离开地图，true表示已离开
 
     private constructor() {
         // 私有构造函数，防止外部实例化
@@ -217,6 +218,7 @@ export class GameManager {
     public initArrows(): void {
         // 清空之前的路径
         this.arrowPaths = [];
+        this.pathLeftMap = []; // 清空离开状态数组
 
         // 示例：设置多条箭头路径，每条路径方向不同，弯弯曲曲的长路径
         // 路径1：向上箭头 - 先向右，再向上，再向左，再向上
@@ -226,6 +228,8 @@ export class GameManager {
             { x: this.getRoundItemX(1, 1), y: this.getRoundItemY(1, 1) },
             { x: this.getRoundItemX(2, 2), y: this.getRoundItemY(2, 2) },
         ]);
+        this.pathLeftMap.push(false); // 初始化第一条路径为未离开
+        
         // 第14行              0 1 
         // 第13行            0 1 2 3 
         // 第12行          0 1 2 3 4 05
@@ -243,8 +247,17 @@ export class GameManager {
         // 第0行               0 1 
         console.log('箭头路径初始化完成');
     }
-    /**箭头移动方法*/
-    arrowPathMove(speed: number = 5, pathIdx: number) {
+    /**
+     * 箭头移动方法
+     * @param speed 移动速度
+     * @param pathIdx 路径索引
+     */
+    arrowPathMove(speed: number = 5, pathIdx: number): void {
+        if (this.pathLeftMap[pathIdx]) {
+            // 如果路径已经离开地图，不再移动
+            return;
+        }
+
         if (this.arrowPaths[pathIdx] && this.arrowPaths[pathIdx].length > 1) {
             let curPath = this.arrowPaths[pathIdx];
             //处理头部方向移动
@@ -259,7 +272,100 @@ export class GameManager {
             if(curPath[lastIdx].x == curPath[lastIdx-1].x && curPath[lastIdx].y == curPath[lastIdx-1].y){
                 this.arrowPaths[pathIdx].pop();//删除尾部
             }
+
+            // 检测路径是否完全离开地图上的圆圈
+            this.checkPathLeftMap(pathIdx);
         }
+    }
+
+    /**
+     * 检测路径是否完全离开地图上的圆圈
+     * @param pathIdx 路径索引
+     */
+    private checkPathLeftMap(pathIdx: number): void {
+        if (this.pathLeftMap[pathIdx]) {
+            return; // 已经标记为离开，不再检测
+        }
+       let path = this.arrowPaths[pathIdx];
+    }
+
+    /**
+     * 检查点击位置是否在路径上
+     * @param x 点击X坐标
+     * @param y 点击Y坐标
+     * @param hitDistance 点击容差距离，默认20
+     * @returns 点击到的路径索引，如果没有点击到则返回-1
+     */
+    public checkPathHit(x: number, y: number, hitDistance: number = 10): number {
+        for (let pathIdx = 0; pathIdx < this.arrowPaths.length; pathIdx++) {
+            if (this.pathLeftMap[pathIdx]) {
+                continue; // 已离开的路径不响应点击
+            }
+
+            const path = this.arrowPaths[pathIdx];
+            if (!path || path.length < 2) {
+                continue;
+            }
+
+            // 检查点击位置是否在路径的任意线段上
+            for (let i = 0; i < path.length - 1; i++) {
+                const startX = path[i + 1].x;
+                const startY = path[i + 1].y;
+                const endX = path[i].x;
+                const endY = path[i].y;
+
+                // 计算点到线段的距离
+                const distance = this.pointToLineDistance(x, y, startX, startY, endX, endY);
+                console.log('Jay点到线段距离',i,i+1,distance);
+                if (distance <= hitDistance) {
+                    return pathIdx; // 点击到了这条路径
+                }
+            }
+        }
+
+        return -1; // 没有点击到任何路径
+    }
+
+    /**
+     * 计算点到线段的距离
+     * @param px 点X坐标
+     * @param py 点Y坐标
+     * @param x1 线段起点X
+     * @param y1 线段起点Y
+     * @param x2 线段终点X
+     * @param y2 线段终点Y
+     * @returns 距离
+     */
+    private pointToLineDistance(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
+        const A = px - x1;
+        const B = py - y1;
+        const C = x2 - x1;
+        const D = y2 - y1;
+
+        const dot = A * C + B * D;
+        const lenSq = C * C + D * D;
+        let param = -1;
+
+        if (lenSq !== 0) {
+            param = dot / lenSq;
+        }
+
+        let xx, yy;
+
+        if (param < 0) {
+            xx = x1;
+            yy = y1;
+        } else if (param > 1) {
+            xx = x2;
+            yy = y2;
+        } else {
+            xx = x1 + param * C;
+            yy = y1 + param * D;
+        }
+
+        const dx = px - xx;
+        const dy = py - yy;
+        return Math.sqrt(dx * dx + dy * dy);
     }
 
     // ========== Getter/Setter ==========
@@ -358,7 +464,33 @@ export class GameManager {
     public addArrowPath(points: { x: number, y: number }[]): void {
         if (points.length >= 2) {
             this.arrowPaths.push([...points]);
+            this.pathLeftMap.push(false); // 新路径初始化为未离开
         }
+    }
+
+    /**
+     * 获取路径离开地图状态数组
+     */
+    public getPathLeftMap(): boolean[] {
+        return this.pathLeftMap;
+    }
+
+    /**
+     * 检查指定路径是否已离开地图
+     * @param pathIdx 路径索引
+     */
+    public isPathLeftMap(pathIdx: number): boolean {
+        return this.pathLeftMap[pathIdx] === true;
+    }
+
+    /**
+     * 检查是否所有路径都已离开地图（通关条件）
+     */
+    public areAllPathsLeftMap(): boolean {
+        if (this.pathLeftMap.length === 0) {
+            return false;
+        }
+        return this.pathLeftMap.every(left => left === true);
     }
 
     /**

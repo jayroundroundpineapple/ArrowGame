@@ -1,4 +1,4 @@
-import { _decorator, Color, Component, Graphics, Node, Prefab, Vec3, UITransform } from 'cc';
+import { _decorator, Color, Component, Graphics, Node, Prefab, Vec3, UITransform, EventTouch, UITransform as UITransformComp } from 'cc';
 import { Macro } from './Macro';
 import { GameManager } from './GameManager';
 const { ccclass, property } = _decorator;
@@ -31,13 +31,11 @@ export class GameUI extends Component {
         
         // 初始化Graphics
         this.initGraphics();
-        this.testBtn.on(Node.EventType.TOUCH_END, this.onTestBtnClick, this);
+        
         // 加载关卡
         await this.gameManager.loadLevel(1);
-        
         // 初始化箭头路径
         this.gameManager.initArrows();
-        
         // 绘制箭头
         this.draw();
         
@@ -45,11 +43,103 @@ export class GameUI extends Component {
         if (this.arrowGraphics) {
             this.arrowGraphics.node.setSiblingIndex(999);
         }
+        // 添加点击事件监听
+        this.setupTouchEvents();
     }
-    onTestBtnClick(){
-        this.gameManager.arrowPathMove(5,0);
-        this.draw();
+
+    /**
+     * 设置触摸事件
+     */
+    private setupTouchEvents(): void {
+        // 在arrowGraphics节点上添加触摸监听
+        if (this.arrowGraphics && this.arrowGraphics.node) {
+            this.arrowGraphics.node.on(Node.EventType.TOUCH_END, this.onPathTouch, this);
+        }
     }
+
+    /**
+     * 处理路径点击事件
+     */
+    private onPathTouch(event: EventTouch): void {
+        console.log('=== 点击事件触发 ===');
+        
+        const arrowWorldPos =event.getUILocation();
+        const touchPos = this.gameMapNode.getComponent(UITransformComp).convertToNodeSpaceAR(new Vec3(arrowWorldPos.x, arrowWorldPos.y, 0));
+        console.log('arrowGraphics世界坐标:', arrowWorldPos.x, arrowWorldPos.y);
+        // console.log('arrowGraphics本地坐标:', arrowLocalPos.x, arrowLocalPos.y);
+        
+        // 由于arrowGraphics是gameMapNode的子节点，且位置是(0,0,0)
+        // 所以arrowGraphics的本地坐标就是gameMapNode的本地坐标
+        // 直接使用即可
+        const finalX = touchPos.x;
+        const finalY = touchPos.y;
+        
+        console.log('最终使用的坐标（gameMapNode坐标系）:', finalX, finalY);
+        
+        
+        // 打印所有路径点用于调试
+        const arrowPaths = this.gameManager.getArrowPaths();
+        console.log('当前路径数量:', arrowPaths.length);
+        for (let i = 0; i < arrowPaths.length; i++) {
+            const path = arrowPaths[i];
+            console.log(`路径 ${i} 有 ${path.length} 个点:`);
+            for (let j = 0; j < path.length; j++) {
+                const point = path[j];
+                if (point && point.x !== null && point.y !== null) {
+                    console.log(`  点 ${j}: (${point.x}, ${point.y})`);
+                } else {
+                    console.log(`  点 ${j}: null或无效`);
+                }
+            }
+        }
+        
+        // 手动检查第一个路径的第一个线段，看看距离是多少
+        if (arrowPaths.length > 0 && arrowPaths[0].length >= 2) {
+            const path = arrowPaths[0];
+            const startX = path[1].x;
+            const startY = path[1].y;
+            const endX = path[0].x;
+            const endY = path[0].y;
+            
+            if (startX !== null && startY !== null && endX !== null && endY !== null) {
+                const dx = finalX - startX;
+                const dy = finalY - startY;
+                const distToStart = Math.sqrt(dx * dx + dy * dy);
+                console.log(`测试：点击点到路径0第一个线段起点的距离: ${distToStart.toFixed(2)}`);
+                console.log(`      线段起点: (${startX}, ${startY}), 终点: (${endX}, ${endY})`);
+            } else {
+                console.log('路径0的点包含null值！');
+            }
+        }
+        const hitPathIdx = this.gameManager.checkPathHit(finalX, finalY, 10);
+        
+        if (hitPathIdx >= 0) {
+            console.log('✓ 点击到路径:', hitPathIdx);
+            // 点击到了路径，开始移动
+            this.startPathMovement(hitPathIdx);
+            console.log(`开始移动路径 ${hitPathIdx}`);
+        } else {
+            console.log('✗ 未点击到任何路径');
+        }
+        console.log('=== 点击事件结束 ===\n');
+    }
+
+    /**
+     * 开始路径移动
+     * @param pathIdx 路径索引
+     */
+    private startPathMovement(pathIdx: number): void {
+        // 如果路径已经在移动，不重复启动
+        if (this.movingPathIndex === pathIdx) {
+            return;
+        }
+
+        this.movingPathIndex = pathIdx;
+        this.isMoving = true;
+    }
+
+    private movingPathIndex: number = -1; // 当前正在移动的路径索引
+    private isMoving: boolean = false; // 是否正在移动
     /**
      * 初始化Graphics组件
      */
@@ -65,6 +155,40 @@ export class GameUI extends Component {
         
         this.arrowGraphics.lineJoin = Graphics.LineJoin.MITER;
         this.arrowGraphics.miterLimit = 10;
+
+        // 启用触摸事件（Graphics默认不接收触摸事件）
+        const uiTransform = this.arrowGraphics.node.getComponent(UITransform);
+        if (uiTransform) {
+            // 设置足够大的触摸区域
+            uiTransform.setContentSize(2000, 2000);
+        }
+    }
+
+    /**
+     * 更新循环 - 处理路径移动
+     */
+    update(deltaTime: number): void {
+        if (this.isMoving && this.movingPathIndex >= 0) {
+            // 移动路径
+            this.gameManager.arrowPathMove(5, this.movingPathIndex);
+            
+            // 重新绘制
+            this.draw();
+
+            // 检查路径是否已离开地图
+            if (this.gameManager.isPathLeftMap(this.movingPathIndex)) {
+                const leftPathIdx = this.movingPathIndex; // 保存路径索引用于日志
+                this.isMoving = false;
+                this.movingPathIndex = -1;
+                console.log(`路径 ${leftPathIdx} 已离开地图，停止移动`);
+
+                // 检查是否所有路径都离开了（通关判断）
+                if (this.gameManager.areAllPathsLeftMap()) {
+                    console.log('所有路径都已离开地图，通关成功！');
+                    // 这里可以触发通关事件
+                }
+            }
+        }
     }
     /**
      * 绘制箭头路径
