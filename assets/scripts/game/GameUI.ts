@@ -15,6 +15,8 @@ export class GameUI extends Component {
     private gameMapNode: Node = null;
     @property(Prefab)
     private mapRoundItemPre: Prefab = null;
+    @property(Node)
+    private testBtn: Node = null;
 
     private gameManager: GameManager = null;
 
@@ -29,7 +31,7 @@ export class GameUI extends Component {
         
         // 初始化Graphics
         this.initGraphics();
-        
+        this.testBtn.on(Node.EventType.TOUCH_END, this.onTestBtnClick, this);
         // 加载关卡
         await this.gameManager.loadLevel(1);
         
@@ -43,6 +45,10 @@ export class GameUI extends Component {
         if (this.arrowGraphics) {
             this.arrowGraphics.node.setSiblingIndex(999);
         }
+    }
+    onTestBtnClick(){
+        this.gameManager.arrowPathMove(5,0);
+        this.draw();
     }
     /**
      * 初始化Graphics组件

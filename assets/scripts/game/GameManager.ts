@@ -49,8 +49,8 @@ export class GameManager {
      * 获取方向向量
      * @param x1 起点X坐标
      * @param y1 起点Y坐标
-     * @param x2 终点X坐标
-     * @param y2 终点Y坐标
+     * @param x2 终点X坐标(箭头起点)
+     * @param y2 终点Y坐标(箭头起点)
      * @returns 方向向量 {x, y}，支持上下左右四个基本方向
      *          {x: 0, y: 1} 向上
      *          {x: 0, y: -1} 向下
@@ -153,7 +153,7 @@ export class GameManager {
                 if (mapRoundItemComp) {
                     mapRoundItemComp.initItem(row, col, x, y);
                     this.roundItemsArr.push(mapRoundItemComp);
-                    
+
                     // 记录坐标
                     const key = `${row}_${col}`;
                     this.roundItemPositions.set(key, { x, y });
@@ -198,7 +198,7 @@ export class GameManager {
                 if (mapRoundItemComp) {
                     mapRoundItemComp.initItem(row, col, x, y);
                     this.roundItemsArr.push(mapRoundItemComp);
-                    
+
                     // 记录坐标
                     const key = `${row}_${col}`;
                     this.roundItemPositions.set(key, { x, y });
@@ -221,10 +221,10 @@ export class GameManager {
         // 示例：设置多条箭头路径，每条路径方向不同，弯弯曲曲的长路径
         // 路径1：向上箭头 - 先向右，再向上，再向左，再向上
         this.arrowPaths.push([
-            { x: this.getRoundItemX(0,1), y: this.getRoundItemY(0,1) }, //箭头位置
-            { x: this.getRoundItemX(1,2), y: this.getRoundItemY(1,2) },
-            { x: this.getRoundItemX(1,1), y: this.getRoundItemY(1,1) }, 
-            { x: this.getRoundItemX(2,2), y: this.getRoundItemY(2,2) },
+            { x: this.getRoundItemX(0, 1), y: this.getRoundItemY(0, 1) }, //箭头位置
+            { x: this.getRoundItemX(1, 2), y: this.getRoundItemY(1, 2) },
+            { x: this.getRoundItemX(1, 1), y: this.getRoundItemY(1, 1) },
+            { x: this.getRoundItemX(2, 2), y: this.getRoundItemY(2, 2) },
         ]);
         // 第14行              0 1 
         // 第13行            0 1 2 3 
@@ -241,8 +241,25 @@ export class GameManager {
         // 第2行           0 1 2 3 4 5
         // 第1行             0 1 2 3 
         // 第0行               0 1 
-        
         console.log('箭头路径初始化完成');
+    }
+    /**箭头移动方法*/
+    arrowPathMove(speed: number = 5, pathIdx: number) {
+        if (this.arrowPaths[pathIdx] && this.arrowPaths[pathIdx].length > 1) {
+            let curPath = this.arrowPaths[pathIdx];
+            //处理头部方向移动
+            let dir = this.getDir(curPath[1].x, curPath[1].y, curPath[0].x, curPath[0].y);
+            curPath[0].x += dir.x * speed;
+            curPath[0].y += dir.y * speed;
+            //再处理尾部移动
+            let lastIdx = this.arrowPaths[pathIdx].length - 1;
+            dir = this.getDir(curPath[lastIdx].x, curPath[lastIdx].y, curPath[lastIdx - 1].x, curPath[lastIdx - 1].y);
+            curPath[lastIdx].x += dir.x * speed;
+            curPath[lastIdx].y += dir.y * speed;
+            if(curPath[lastIdx].x == curPath[lastIdx-1].x && curPath[lastIdx].y == curPath[lastIdx-1].y){
+                this.arrowPaths[pathIdx].pop();//删除尾部
+            }
+        }
     }
 
     // ========== Getter/Setter ==========
