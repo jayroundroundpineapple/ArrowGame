@@ -229,7 +229,7 @@ export class GameManager {
             { x: this.getRoundItemX(2, 2), y: this.getRoundItemY(2, 2) },
         ]);
         this.pathLeftMap.push(false); // 初始化第一条路径为未离开
-        
+
         // 第14行              0 1 
         // 第13行            0 1 2 3 
         // 第12行          0 1 2 3 4 05
@@ -269,26 +269,15 @@ export class GameManager {
             dir = this.getDir(curPath[lastIdx].x, curPath[lastIdx].y, curPath[lastIdx - 1].x, curPath[lastIdx - 1].y);
             curPath[lastIdx].x += dir.x * speed;
             curPath[lastIdx].y += dir.y * speed;
-            if(curPath[lastIdx].x == curPath[lastIdx-1].x && curPath[lastIdx].y == curPath[lastIdx-1].y){
+            if (curPath[lastIdx].x == curPath[lastIdx - 1].x && curPath[lastIdx].y == curPath[lastIdx - 1].y) {
                 this.arrowPaths[pathIdx].pop();//删除尾部
             }
-
-            // 检测路径是否完全离开地图上的圆圈
-            this.checkPathLeftMap(pathIdx);
+        }
+        if (this.arrowPaths[pathIdx].length <= 1) {
+            console.log(`路径${pathIdx}已经离开地图`);
+            this.pathLeftMap[pathIdx] = true;      
         }
     }
-
-    /**
-     * 检测路径是否完全离开地图上的圆圈
-     * @param pathIdx 路径索引
-     */
-    private checkPathLeftMap(pathIdx: number): void {
-        if (this.pathLeftMap[pathIdx]) {
-            return; // 已经标记为离开，不再检测
-        }
-       let path = this.arrowPaths[pathIdx];
-    }
-
     /**
      * 检查点击位置是否在路径上
      * @param x 点击X坐标
@@ -316,7 +305,7 @@ export class GameManager {
 
                 // 计算点到线段的距离
                 const distance = this.pointToLineDistance(x, y, startX, startY, endX, endY);
-                console.log('Jay点到线段距离',i,i+1,distance);
+                console.log('Jay点到线段距离', i, i + 1, distance);
                 if (distance <= hitDistance) {
                     return pathIdx; // 点击到了这条路径
                 }

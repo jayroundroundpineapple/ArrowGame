@@ -27,9 +27,7 @@ export class GameUI extends Component {
     async start() {
         (window as any).gameUI = this;
         
-        // 初始化Graphics
         this.initGraphics();
-        
         // 加载关卡
         await this.gameManager.loadLevel(1);
         // 初始化箭头路径
@@ -152,7 +150,6 @@ export class GameUI extends Component {
         
         this.arrowGraphics.lineJoin = Graphics.LineJoin.MITER;
         this.arrowGraphics.miterLimit = 10;
-
         // 启用触摸事件（Graphics默认不接收触摸事件）
         const uiTransform = this.arrowGraphics.node.getComponent(UITransform);
         if (uiTransform) {
@@ -179,10 +176,8 @@ export class GameUI extends Component {
                 this.movingPathIndex = -1;
                 console.log(`路径 ${leftPathIdx} 已离开地图，停止移动`);
 
-                // 检查是否所有路径都离开了（通关判断）
                 if (this.gameManager.areAllPathsLeftMap()) {
                     console.log('所有路径都已离开地图，通关成功！');
-                    // 这里可以触发通关事件
                 }
             }
         }
