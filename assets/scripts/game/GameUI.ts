@@ -1,4 +1,4 @@
-import { _decorator, Color, Component, Graphics, Node, Prefab, Vec3, UITransform, EventTouch, UITransform as UITransformComp } from 'cc';
+import { _decorator, Color, Component, Graphics, Node, Prefab, Vec3, UITransform, EventTouch, UITransform as UITransformComp, Vec2 } from 'cc';
 import { Macro } from './Macro';
 import { GameManager } from './GameManager';
 const { ccclass, property } = _decorator;
@@ -15,8 +15,6 @@ export class GameUI extends Component {
     private gameMapNode: Node = null;
     @property(Prefab)
     private mapRoundItemPre: Prefab = null;
-    @property(Node)
-    private testBtn: Node = null;
 
     private gameManager: GameManager = null;
 
@@ -63,9 +61,9 @@ export class GameUI extends Component {
     private onPathTouch(event: EventTouch): void {
         console.log('=== 点击事件触发 ===');
         
-        const arrowWorldPos =event.getUILocation();
-        const touchPos = this.gameMapNode.getComponent(UITransformComp).convertToNodeSpaceAR(new Vec3(arrowWorldPos.x, arrowWorldPos.y, 0));
-        console.log('arrowGraphics世界坐标:', arrowWorldPos.x, arrowWorldPos.y);
+        let touchWorldPos:Vec2 =event.getUILocation();
+        let touchPos = this.gameMapNode.getComponent(UITransformComp).convertToNodeSpaceAR(new Vec3(touchWorldPos.x, touchWorldPos.y, 0));
+        console.log('arrowGraphics世界坐标:', touchWorldPos.x, touchWorldPos.y);
         // console.log('arrowGraphics本地坐标:', arrowLocalPos.x, arrowLocalPos.y);
         
         // 由于arrowGraphics是gameMapNode的子节点，且位置是(0,0,0)
@@ -73,7 +71,6 @@ export class GameUI extends Component {
         // 直接使用即可
         const finalX = touchPos.x;
         const finalY = touchPos.y;
-        
         console.log('最终使用的坐标（gameMapNode坐标系）:', finalX, finalY);
         
         
