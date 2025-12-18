@@ -79,8 +79,8 @@ export class WebAdapter extends Component {
             );
         }
         let isVerticalScreen: boolean = Utils.isVertical();
-        this.bgNode.getComponent(Sprite).spriteFrame = this.bgSpriteFrame[isVerticalScreen ? 0 : 1];
-        this.loadPage.getComponent(Sprite).spriteFrame = this.loadPageSpriteFrame[isVerticalScreen ? 0 : 1];
-        this.loadPage.children[0].setScale(isVerticalScreen ? new Vec3(1, 1, 1) : new Vec3(1.5, 1.5, 1)); 
+        // this.bgNode.getComponent(Sprite).spriteFrame = this.bgSpriteFrame[isVerticalScreen ? 0 : 1];
+        // this.loadPage.getComponent(Sprite).spriteFrame = this.loadPageSpriteFrame[isVerticalScreen ? 0 : 1];
+        // this.loadPage.children[0].setScale(isVerticalScreen ? new Vec3(1, 1, 1) : new Vec3(1.5, 1.5, 1)); 
     }
 }
