@@ -1,4 +1,4 @@
-import { _decorator, Color, Component, Graphics, JsonAsset, Node, Prefab, resources, instantiate, Vec3 } from 'cc';
+import { _decorator, Color, Component, Graphics, JsonAsset, Node, Prefab, resources, instantiate, Vec3, UITransform } from 'cc';
 import { Macro } from './Macro';
 import { mapRoundItem } from './mapRoundItem';
 const { ccclass, property } = _decorator;
@@ -13,6 +13,8 @@ export class GameUI extends Component {
     private mapRoundItemPre: Prefab = null;
 
     private static _instance: GameUI = null;
+
+    private roundItemsArr: mapRoundItem[] = [];   
     _arrowPaths: { x: number, y: number }[][] = [];
     private currentLevel: number = 1; // 当前关卡索引，从1开始
     private levelData: any = null; // 关卡数据
@@ -28,67 +30,16 @@ export class GameUI extends Component {
     }
     start() {
         (window as any).gameUI = this;
-        this.arrowGraphics.node.setParent(this.gameMapNode);
         this.initMap();
-        // 示例：设置多条箭头路径，每条路径方向不同，弯弯曲曲的长路径
-        // 路径1：向上箭头 - 先向右，再向上，再向左，再向上
-        this._arrowPaths.push([
-            { x: 0, y: 100 },
-            { x: 50, y: 100 },
-            { x: 50, y: 150 },
-            { x: 0, y: 150 },
-            { x: 0, y: 200 }
-        ]);
-        
-        // 路径2：向下箭头 - 先向左，再向下，再向右，再向下
-        this._arrowPaths.push([
-            { x: 150, y: 200 },
-            { x: 100, y: 200 },
-            { x: 100, y: 150 },
-            { x: 150, y: 150 },
-            { x: 150, y: 100 }
-        ]);
-        
-        // 路径3：向右箭头 - 先向上，再向右，再向下，再向右
-        this._arrowPaths.push([
-            { x: 0, y: 0 },
-            { x: 0, y: 50 },
-            { x: 50, y: 50 },
-            { x: 50, y: 0 },
-            { x: 100, y: 0 }
-        ]);
-        
-        // 路径4：向左箭头 - 先向下，再向左，再向上，再向左
-        this._arrowPaths.push([
-            { x: 250, y: 0 },
-            { x: 250, y: -50 },
-            { x: 200, y: -50 },
-            { x: 200, y: 0 },
-            { x: 150, y: 0 }
-        ]);
-        
-        // 路径5：向上箭头 - 先向右，再向上，再向左，再向上，再向右
-        this._arrowPaths.push([
-            { x: 200, y: -100 },
-            { x: 250, y: -100 },
-            { x: 250, y: -50 },
-            { x: 200, y: -50 },
-            { x: 200, y: 0 },
-            { x: 250, y: 0 }
-        ]);
-        
-        // 路径6：向下箭头 - 先向左，再向下，再向右，再向下，再向左
-        this._arrowPaths.push([
-            { x: 350, y: 100 },
-            { x: 300, y: 100 },
-            { x: 300, y: 50 },
-            { x: 350, y: 50 },
-            { x: 350, y: 0 },
-            { x: 300, y: 0 }
-        ]);
-
-        // 绘制所有箭头路径
-        this.draw();
+    }
+    initGraphics() {
+        this.arrowGraphics = new Node().addComponent(Graphics);
+        this.arrowGraphics.node.addComponent(UITransform);
+        this.arrowGraphics.node.name = 'arrowGraphics';
+        this.arrowGraphics.node.setParent(this.gameMapNode);
+        this.arrowGraphics.node.setPosition(new Vec3(0, 0, 0));
+        this.arrowGraphics.lineJoin = Graphics.LineJoin.MITER;
+        this.arrowGraphics.miterLimit = 10;
     }
     /**
      * 初始化地图
@@ -143,17 +94,17 @@ export class GameUI extends Component {
                 // 实例化预制体
                 const itemNode = instantiate(this.mapRoundItemPre);
                 // 设置位置
-                const x =  (col - Math.floor(totalCols / 2)) * Macro.mapRoundHorizontalGap;
-                const y =  (row * Macro.maoRoundVerticalGap);
+                const x = (col - Math.floor(totalCols / 2)) * Macro.mapRoundHorizontalGap;
+                const y = (row * Macro.maoRoundVerticalGap);
                 itemNode.setPosition(new Vec3(x, y, 0));
-                
+
                 // 设置父节点
                 itemNode.setParent(this.gameMapNode);
-                
+
                 // 获取 mapRoundItem 组件并初始化
                 const mapRoundItemComp = itemNode.getComponent(mapRoundItem);
                 if (mapRoundItemComp) {
-                    mapRoundItemComp.initItem(row, col);
+                    mapRoundItemComp.initItem(row, col, x, y);
                 }
             }
         }
@@ -167,6 +118,8 @@ export class GameUI extends Component {
      * @param rowCounts 每行的圆点数量数组
      */
     private createMapRoundItemsWithRowCounts(rows: number, rowCounts: number[]): void {
+        // 地图创建完成后，初始化箭头
+
         if (!this.gameMapNode || !this.mapRoundItemPre) {
             console.error('gameMapNode 或 mapRoundItemPre 未设置');
             return;
@@ -177,8 +130,6 @@ export class GameUI extends Component {
             return;
         }
 
-        // 找到最大圆点数量，用于计算居中偏移
-        const maxCount = Math.max(...rowCounts);
         let totalItems = 0;
 
         // 遍历每一行
@@ -193,26 +144,101 @@ export class GameUI extends Component {
             for (let col = 0; col < countInRow; col++) {
                 // 实例化预制体
                 const itemNode = instantiate(this.mapRoundItemPre);
-                
+
                 // 设置位置（每行居中）
                 const x = offsetX + col * Macro.mapRoundHorizontalGap;
                 const y = row * Macro.maoRoundVerticalGap;
                 itemNode.setPosition(new Vec3(x, y, 0));
-                
+
                 // 设置父节点
                 itemNode.setParent(this.gameMapNode);
-                
+
                 // 获取 mapRoundItem 组件并初始化
                 const mapRoundItemComp = itemNode.getComponent(mapRoundItem);
                 if (mapRoundItemComp) {
-                    mapRoundItemComp.initItem(row, col);
+                    mapRoundItemComp.initItem(row, col,x,y);
+                    this.roundItemsArr.push(mapRoundItemComp);
                 }
                 totalItems++;
             }
         }
-
         console.log(`成功创建 ${rows} 行非规则布局的 mapRoundItem，共 ${totalItems} 个`);
         console.log(`每行圆点数量: [${rowCounts.join(', ')}]`);
+        console.log(`roundItemsArr: [${this.roundItemsArr.map(item => item.PosX).join(', ')}]`);
+        console.log(`roundItemsArr: [${this.roundItemsArr.map(item => item.PosY).join(', ')}]`);
+        // 地图创建完成后，初始化箭头
+        this.arrowGraphics.node.setSiblingIndex(999);
+        this.initArrows();
+    }
+
+    /**
+     * 初始化箭头路径
+     * 在地图创建完成后调用
+     */
+    private initArrows(): void {
+        // 清空之前的路径
+        this._arrowPaths = [];
+
+        // 示例：设置多条箭头路径，每条路径方向不同，弯弯曲曲的长路径
+        // 路径1：向上箭头 - 先向右，再向上，再向左，再向上
+        this._arrowPaths.push([
+            { x: 0, y: 100 },
+            { x: 50, y: 100 },
+            { x: 50, y: 150 },
+            { x: 0, y: 150 },
+            { x: 0, y: 200 }
+        ]);
+
+        // 路径2：向下箭头 - 先向左，再向下，再向右，再向下
+        this._arrowPaths.push([
+            { x: 150, y: 200 },
+            { x: 100, y: 200 },
+            { x: 100, y: 150 },
+            { x: 150, y: 150 },
+            { x: 150, y: 100 }
+        ]);
+
+        // 路径3：向右箭头 - 先向上，再向右，再向下，再向右
+        this._arrowPaths.push([
+            { x: 0, y: 0 },
+            { x: 0, y: 50 },
+            { x: 50, y: 50 },
+            { x: 50, y: 0 },
+            { x: 100, y: 0 }
+        ]);
+
+        // 路径4：向左箭头 - 先向下，再向左，再向上，再向左
+        this._arrowPaths.push([
+            { x: 250, y: 0 },
+            { x: 250, y: -50 },
+            { x: 200, y: -50 },
+            { x: 200, y: 0 },
+            { x: 150, y: 0 }
+        ]);
+
+        // 路径5：向上箭头 - 先向右，再向上，再向左，再向上，再向右
+        this._arrowPaths.push([
+            { x: 200, y: -100 },
+            { x: 250, y: -100 },
+            { x: 250, y: -50 },
+            { x: 200, y: -50 },
+            { x: 200, y: 0 },
+            { x: 250, y: 0 }
+        ]);
+
+        // 路径6：向下箭头 - 先向左，再向下，再向右，再向下，再向左
+        this._arrowPaths.push([
+            { x: 350, y: 100 },
+            { x: 300, y: 100 },
+            { x: 300, y: 50 },
+            { x: 350, y: 50 },
+            { x: 350, y: 0 },
+            { x: 300, y: 0 }
+        ]);
+
+        // 绘制所有箭头路径
+        this.draw();
+        console.log('箭头路径初始化完成');
     }
     /**
      * 绘制箭头路径
@@ -253,7 +279,7 @@ export class GameUI extends Component {
             }
         }
     }
-    private drawArrow(endX: number,endY: number, dir: { x: number, y: number }): void {
+    private drawArrow(endX: number, endY: number, dir: { x: number, y: number }): void {
         this.arrowGraphics.moveTo(endX + dir.x * 15, endY + dir.y * 15);
         this.arrowGraphics.lineTo(endX - dir.y * 15, endY + dir.x * 15);
         this.arrowGraphics.lineTo(endX + dir.y * 15, endY - dir.x * 15);

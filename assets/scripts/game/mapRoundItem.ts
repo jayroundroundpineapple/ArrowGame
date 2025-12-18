@@ -8,9 +8,19 @@ export class mapRoundItem extends Component {
 
     _round: number = 0; //地图当前圆点所在行
     _colMun:number = 0; //地图当前圆点所在列
-    initItem(roundIndex: number, colMunIndex: number){
+    _posX:number = 0;
+    _posY:number = 0;
+    initItem(roundIndex: number, colMunIndex: number, posX: number, posY: number){
         this._round = roundIndex;
         this._colMun = colMunIndex;
+        this._posX = posX;
+        this._posY = posY;
+    }
+    get PosX(): number {
+        return this._posX;
+    }
+    get PosY(): number {
+        return this._posY;
     }
     set RoundIndex(roundIndex: number){
         this._round = roundIndex;

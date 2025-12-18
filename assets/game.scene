@@ -562,7 +562,7 @@
       "y": 0,
       "z": 0
     },
-    "_id": "fbLlRF+nlC4ZccwivyQ6Mg"
+    "_id": "9dxay77/tO4rItZWZTlsqa"
   },
   {
     "__type__": "cc.UITransform",
@@ -584,7 +584,7 @@
       "x": 0.5,
       "y": 0.5
     },
-    "_id": "7cKERxuTVEbZY4EZj+R4SC"
+    "_id": "88+T52tcpGxoTqdtjNrBel"
   },
   {
     "__type__": "cc.Graphics",
@@ -606,7 +606,7 @@
       "b": 255,
       "a": 255
     },
-    "_lineWidth": 5,
+    "_lineWidth": 1,
     "_strokeColor": {
       "__type__": "cc.Color",
       "r": 0,
@@ -624,7 +624,7 @@
       "a": 255
     },
     "_miterLimit": 10,
-    "_id": "efdyEBBPNKUbDIv6sOtb4v"
+    "_id": "b5VX/0WqdOZ78ewsr0TYiC"
   },
   {
     "__type__": "cc.UITransform",

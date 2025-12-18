@@ -8,6 +8,6 @@ export class Macro {
         None:{x:0,y:0}
     }
 
-    public static mapRoundHorizontalGap = 35; //地图圆点横向间距
+    public static mapRoundHorizontalGap = 40; //地图圆点横向间距
     public static maoRoundVerticalGap = 40; //地图圆点纵向间距
 }
