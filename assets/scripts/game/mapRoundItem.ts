@@ -6,6 +6,7 @@ export class mapRoundItem extends Component {
     @property(Node)
     private mapNode: Node = null;
 
+    _isFree: boolean = false; //地图当前圆点是否已经被绘制占用
     _round: number = 0; //地图当前圆点所在行
     _colMun:number = 0; //地图当前圆点所在列
     _posX:number = 0;
@@ -15,6 +16,13 @@ export class mapRoundItem extends Component {
         this._colMun = colMunIndex;
         this._posX = posX;
         this._posY = posY;
+        this._isFree = false;
+    }
+    get isFree(): boolean {
+        return this._isFree;
+    }
+    set isFree(isFree: boolean){
+        this._isFree = isFree;
     }
     get PosX(): number {
         return this._posX;

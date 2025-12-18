@@ -17,6 +17,7 @@ export class GameManager {
     private roundItemsArr: mapRoundItem[] = []; // 所有圆圈组件数组
     private gameMapNode: Node = null; // 地图父节点
     private mapRoundItemPre: Prefab = null; // 圆圈预制体
+    private roundItemPositions: Map<string, { x: number, y: number }> = new Map(); // 存储每个圆点的坐标，key: "row_col"
 
     // 箭头路径相关
     private arrowPaths: { x: number, y: number }[][] = []; // 箭头路径数组
@@ -85,6 +86,7 @@ export class GameManager {
     public async loadLevel(level: number = 1): Promise<void> {
         this.currentLevel = level;
         this.roundItemsArr = []; // 清空之前的圆圈数组
+        this.roundItemPositions.clear(); // 清空坐标记录
 
         return new Promise((resolve, reject) => {
             // 加载关卡配置文件
@@ -141,26 +143,23 @@ export class GameManager {
         // 遍历创建每个圆点
         for (let row = 0; row < rows; row++) {
             for (let col = 0; col < cols; col++) {
-                // 实例化预制体
                 const itemNode = instantiate(this.mapRoundItemPre);
-                
-                // 设置位置
                 const x = (col - Math.floor(totalCols / 2)) * Macro.mapRoundHorizontalGap;
                 const y = (row * Macro.maoRoundVerticalGap);
                 itemNode.setPosition(new Vec3(x, y, 0));
-
-                // 设置父节点
                 itemNode.setParent(this.gameMapNode);
 
-                // 获取 mapRoundItem 组件并初始化
                 const mapRoundItemComp = itemNode.getComponent(mapRoundItem);
                 if (mapRoundItemComp) {
                     mapRoundItemComp.initItem(row, col, x, y);
                     this.roundItemsArr.push(mapRoundItemComp);
+                    
+                    // 记录坐标
+                    const key = `${row}_${col}`;
+                    this.roundItemPositions.set(key, { x, y });
                 }
             }
         }
-
         console.log(`成功创建 ${rows} 行 ${cols} 列的 mapRoundItem，共 ${rows * cols} 个`);
     }
 
@@ -181,33 +180,28 @@ export class GameManager {
         }
 
         let totalItems = 0;
-
-        // 遍历每一行
         for (let row = 0; row < rows; row++) {
             const countInRow = rowCounts[row];
             if (countInRow <= 0) continue;
 
             // 计算当前行的起始X位置（居中）
             const offsetX = -(countInRow - 1) * Macro.mapRoundHorizontalGap / 2;
-
-            // 在当前行创建圆点
             for (let col = 0; col < countInRow; col++) {
-                // 实例化预制体
                 const itemNode = instantiate(this.mapRoundItemPre);
 
-                // 设置位置（每行居中）
                 const x = offsetX + col * Macro.mapRoundHorizontalGap;
                 const y = row * Macro.maoRoundVerticalGap;
                 itemNode.setPosition(new Vec3(x, y, 0));
-
-                // 设置父节点
                 itemNode.setParent(this.gameMapNode);
 
-                // 获取 mapRoundItem 组件并初始化
                 const mapRoundItemComp = itemNode.getComponent(mapRoundItem);
                 if (mapRoundItemComp) {
                     mapRoundItemComp.initItem(row, col, x, y);
                     this.roundItemsArr.push(mapRoundItemComp);
+                    
+                    // 记录坐标
+                    const key = `${row}_${col}`;
+                    this.roundItemPositions.set(key, { x, y });
                 }
                 totalItems++;
             }
@@ -227,60 +221,27 @@ export class GameManager {
         // 示例：设置多条箭头路径，每条路径方向不同，弯弯曲曲的长路径
         // 路径1：向上箭头 - 先向右，再向上，再向左，再向上
         this.arrowPaths.push([
-            { x: 0, y: 100 },
-            { x: 50, y: 100 },
-            { x: 50, y: 150 },
-            { x: 0, y: 150 },
-            { x: 0, y: 200 }
+            { x: this.getRoundItemX(0,1), y: this.getRoundItemY(0,1) }, //箭头位置
+            { x: this.getRoundItemX(1,2), y: this.getRoundItemY(1,2) },
+            { x: this.getRoundItemX(1,1), y: this.getRoundItemY(1,1) }, 
+            { x: this.getRoundItemX(2,2), y: this.getRoundItemY(2,2) },
         ]);
-
-        // 路径2：向下箭头 - 先向左，再向下，再向右，再向下
-        this.arrowPaths.push([
-            { x: 150, y: 200 },
-            { x: 100, y: 200 },
-            { x: 100, y: 150 },
-            { x: 150, y: 150 },
-            { x: 150, y: 100 }
-        ]);
-
-        // 路径3：向右箭头 - 先向上，再向右，再向下，再向右
-        this.arrowPaths.push([
-            { x: 0, y: 0 },
-            { x: 0, y: 50 },
-            { x: 50, y: 50 },
-            { x: 50, y: 0 },
-            { x: 100, y: 0 }
-        ]);
-
-        // 路径4：向左箭头 - 先向下，再向左，再向上，再向左
-        this.arrowPaths.push([
-            { x: 250, y: 0 },
-            { x: 250, y: -50 },
-            { x: 200, y: -50 },
-            { x: 200, y: 0 },
-            { x: 150, y: 0 }
-        ]);
-
-        // 路径5：向上箭头 - 先向右，再向上，再向左，再向上，再向右
-        this.arrowPaths.push([
-            { x: 200, y: -100 },
-            { x: 250, y: -100 },
-            { x: 250, y: -50 },
-            { x: 200, y: -50 },
-            { x: 200, y: 0 },
-            { x: 250, y: 0 }
-        ]);
-
-        // 路径6：向下箭头 - 先向左，再向下，再向右，再向下，再向左
-        this.arrowPaths.push([
-            { x: 350, y: 100 },
-            { x: 300, y: 100 },
-            { x: 300, y: 50 },
-            { x: 350, y: 50 },
-            { x: 350, y: 0 },
-            { x: 300, y: 0 }
-        ]);
-
+        // 第14行              0 1 
+        // 第13行            0 1 2 3 
+        // 第12行          0 1 2 3 4 05
+        // 第11行        0 1 2 3 4 5 06 07
+        // 第10行      0 1 2 3 4 5 6 07 08 09
+        // 第9行     0 1 2 3 4 5 6 7 08 09 10 11
+        // 第8行   0 1 2 3 4 5 6 7 8 09 10 11 12 13
+        // 第7行 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+        // 第6行   0 1 2 3 4 5 6 7 8 9 10 11 12 13
+        // 第5行     0 1 2 3 4 5 6 7 8 9 10 11
+        // 第4行       0 1 2 3 4 5 6 7 8 9
+        // 第3行         0 1 2 3 4 5 6 8
+        // 第2行           0 1 2 3 4 5
+        // 第1行             0 1 2 3 
+        // 第0行               0 1 
+        
         console.log('箭头路径初始化完成');
     }
 
@@ -305,6 +266,59 @@ export class GameManager {
      */
     public getRoundItems(): mapRoundItem[] {
         return this.roundItemsArr;
+    }
+
+    /**
+     * 根据行和列获取圆点的坐标
+     * @param row 行索引
+     * @param col 列索引
+     * @returns 坐标对象 {x, y}，如果不存在则返回 null
+     */
+    public getRoundItemPosition(row: number, col: number): { x: number, y: number } | null {
+        const key = `${row}_${col}`;
+        const position = this.roundItemPositions.get(key);
+        return position || null;
+    }
+
+    /**
+     * 根据行和列获取圆点的X坐标
+     * @param row 行索引
+     * @param col 列索引
+     * @returns X坐标，如果不存在则返回 null
+     */
+    public getRoundItemX(row: number, col: number): number | null {
+        const position = this.getRoundItemPosition(row, col);
+        return position ? position.x : null;
+    }
+
+    /**
+     * 根据行和列获取圆点的Y坐标
+     * @param row 行索引
+     * @param col 列索引
+     * @returns Y坐标，如果不存在则返回 null
+     */
+    public getRoundItemY(row: number, col: number): number | null {
+        const position = this.getRoundItemPosition(row, col);
+        return position ? position.y : null;
+    }
+
+    /**
+     * 获取所有圆点坐标的Map
+     * @returns Map对象，key为 "row_col"，value为 {x, y}
+     */
+    public getAllRoundItemPositions(): Map<string, { x: number, y: number }> {
+        return this.roundItemPositions;
+    }
+
+    /**
+     * 检查指定位置是否存在圆点
+     * @param row 行索引
+     * @param col 列索引
+     * @returns 是否存在
+     */
+    public hasRoundItem(row: number, col: number): boolean {
+        const key = `${row}_${col}`;
+        return this.roundItemPositions.has(key);
     }
 
     /**
