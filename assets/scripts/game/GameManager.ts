@@ -190,8 +190,13 @@ export class GameManager {
             const [row, col] = key.split('_').map(Number);
             allCircles.push({ row, col, x: pos.x, y: pos.y });
         }
+
+        if (allCircles.length === 0) {
+            console.warn('没有找到任何圆圈，无法生成路径');
+            return;
+        }
       
-        // 为每个未覆盖的圆圈生成路径
+        // 第一轮：为每个未覆盖的圆圈生成路径
         for (const circle of allCircles) {
             const circleKey = `${circle.row}_${circle.col}`;
             
@@ -219,9 +224,10 @@ export class GameManager {
                 }
             }
         }
-
-        console.log(`箭头路径初始化完成，共生成 ${this.arrowPaths.length} 条路径`);
-        console.log(`覆盖了 ${coveredCircles.size} 个圆圈，总共 ${allCircles.length} 个圆圈`);
+        // 检查是否还有未覆盖的圆圈
+        if (coveredCircles.size < allCircles.length) {
+            console.warn(`警告：仍有 ${allCircles.length - coveredCircles.size} 个圆圈未被覆盖`);
+        }
     }
 
     /**
@@ -293,51 +299,75 @@ export class GameManager {
         return path.reverse();
     }
 
+     	// 第14行              0 1 
+        // 第13行            0 1 2 3 
+        // 第12行          0 1 2 3 4 5
+        // 第11行        0 1 2 3 4 5 6 07
+        // 第10行      0 1 2 3 4 5 6 7 08 09
+        // 第9行     0 1 2 3 4 5 6 7 8 09 10 11
+        // 第8行   0 1 2 3 4 5 6 7 8 09 10 11 12 13
+        // 第7行 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+        // 第6行   0 1 2 3 4 5 6 7 8 09 10 11 12 13
+        // 第5行     0 1 2 3 4 5 6 7 08 09 10 11
+        // 第4行       0 1 2 3 4 5 6 07 08 09
+        // 第3行         0 1 2 3 4 5 06 08
+        // 第2行           0 1 2 3 4 05
+        // 第1行             0 1 2 3 
+        // 第0行               0 1 
     /**
      * 根据行列查找相邻的圆圈（上下左右方向）
+     * 使用实际坐标来判断，确保路径不斜
      * @param row 当前行
      * @param col 当前列
      * @returns 相邻圆圈的行列信息数组
      */
     private findAdjacentCirclesByRowCol(row: number, col: number): { row: number, col: number }[] {
         const adjacent: { row: number, col: number }[] = [];
-
-        // 检查四个方向：上、下、左、右
-        //行数上升列数递增情况：
-        let directions = [
-            { rowOffset: 1, colOffset: 1 }, // 上（行+1）
-            { rowOffset: -1, colOffset: -1 },  // 下（行-1）
-            { rowOffset: 0, colOffset: -1 }, // 左（列减1）
-            { rowOffset: 0, colOffset: 1 }, // 右（列加1）
-        ];
-        //行数上升列数递减情况：
-        let directions2 = [
-            { rowOffset: 1, colOffset: -1 }, // 上（行+1）
-            { rowOffset: -1, colOffset: 1 },  // 下（行-1）
-            { rowOffset: 0, colOffset: -1 }, // 左（列加1）
-            { rowOffset: 0, colOffset: 1 }, // 右（列减1）
-        ];
-        //刚好在中间列，上方是递减，下方是递增
-        let direction3 = [
-            { rowOffset: 1, colOffset: -1 }, // 上（行-1）
-            { rowOffset: -1, colOffset: 1 },  // 下（行+1）
-            { rowOffset: 0, colOffset: -1 }, // 左（列减1）
-            { rowOffset: 0, colOffset: 1 }, // 右（列加1）
-        ]
-        if(row >Math.floor(this.levelData.rows / 2)){
-            directions = directions2;
-        }
-        if(row == Math.floor(this.levelData.rows / 2)){
-            directions = direction3;
+        
+        // 获取当前圆圈的坐标
+        const currentPos = this.getRoundItemPosition(row, col);
+        if (!currentPos) {
+            return adjacent;
         }
 
-        for (const dir of directions) {
-            const nextRow = row + dir.rowOffset;
-            const nextCol = col + dir.colOffset;
+        const currentX = currentPos.x;
+        const currentY = currentPos.y;
+        const tolerance = 0.1; // 坐标容差
+        const horizontalGap = Macro.mapRoundHorizontalGap;
+        const verticalGap = Macro.maoRoundVerticalGap;
 
-            // 检查下一个位置是否存在圆圈
-            if (this.hasRoundItem(nextRow, nextCol)) {
-                adjacent.push({ row: nextRow, col: nextCol });
+        // 遍历所有圆圈，查找上下左右相邻的圆圈（使用实际坐标判断）
+        for (const [key, pos] of this.roundItemPositions.entries()) {
+            const [otherRow, otherCol] = key.split('_').map(Number);
+            
+            // 跳过自己
+            if (otherRow === row && otherCol === col) {
+                continue;
+            }
+
+            const dx = Math.abs(pos.x - currentX);
+            const dy = Math.abs(pos.y - currentY);
+
+            // 检查是否是上下左右相邻（使用实际坐标和间距判断）
+            // 上：x坐标相同（容差内），y = currentY + verticalGap
+            if (Math.abs(pos.x - currentX) < tolerance && 
+                Math.abs(pos.y - (currentY + verticalGap)) < tolerance) {
+                adjacent.push({ row: otherRow, col: otherCol });
+            }
+            // 下：x坐标相同（容差内），y = currentY - verticalGap
+            else if (Math.abs(pos.x - currentX) < tolerance && 
+                     Math.abs(pos.y - (currentY - verticalGap)) < tolerance) {
+                adjacent.push({ row: otherRow, col: otherCol });
+            }
+            // 左：y坐标相同（容差内），x = currentX - horizontalGap
+            else if (Math.abs(pos.y - currentY) < tolerance && 
+                     Math.abs(pos.x - (currentX - horizontalGap)) < tolerance) {
+                adjacent.push({ row: otherRow, col: otherCol });
+            }
+            // 右：y坐标相同（容差内），x = currentX + horizontalGap
+            else if (Math.abs(pos.y - currentY) < tolerance && 
+                     Math.abs(pos.x - (currentX + horizontalGap)) < tolerance) {
+                adjacent.push({ row: otherRow, col: otherCol });
             }
         }
 
