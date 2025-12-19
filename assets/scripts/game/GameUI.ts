@@ -81,24 +81,19 @@ export class GameUI extends Component {
                 }
             }
         }
-        
         const hitPathIdx = this.gameManager.checkPathHit(finalX, finalY, 10);
-        
         if (hitPathIdx >= 0) {
             console.log('✓ 点击到路径:', hitPathIdx);
-            
             // 获取路径方向
             const path = this.gameManager.getArrowPaths()[hitPathIdx];
             if (!path || path.length < 2) {
                 console.log('路径无效');
                 return;
             }
-
             const startX = path[1].x;
             const startY = path[1].y;
             const endX = path[0].x;
             const endY = path[0].y;
-            
             // 获取路径方向
             const dir = this.gameManager.getDir(startX, startY, endX, endY);
             console.log('当前路径方向:', dir);
@@ -108,7 +103,6 @@ export class GameUI extends Component {
                 console.log('路径被其他路径挡住，无法移动');
                 return;
             }
-            
             // 点击到了路径，开始移动
             this.startPathMovement(hitPathIdx);
             console.log(`开始移动路径 ${hitPathIdx}`);
@@ -116,7 +110,6 @@ export class GameUI extends Component {
             console.log('未点击到任何路径');
         }
     }
-
     /**
      * 开始路径移动
      * @param pathIdx 路径索引
@@ -126,11 +119,9 @@ export class GameUI extends Component {
         if (this.movingPathIndex === pathIdx) {
             return;
         }
-
         this.movingPathIndex = pathIdx;
         this.isMoving = true;
     }
-
     private movingPathIndex: number = -1; // 当前正在移动的路径索引
     private isMoving: boolean = false; // 是否正在移动
     /**
@@ -155,7 +146,6 @@ export class GameUI extends Component {
             uiTransform.setContentSize(2000, 2000);
         }
     }
-
     /**
      * 更新循环 - 处理路径移动
      */
@@ -163,7 +153,6 @@ export class GameUI extends Component {
         if (this.isMoving && this.movingPathIndex >= 0) {
             // 移动路径
             this.gameManager.arrowPathMove(5, this.movingPathIndex);
-            
             // 重新绘制
             this.draw();
 
