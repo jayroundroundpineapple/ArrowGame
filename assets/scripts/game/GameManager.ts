@@ -118,6 +118,10 @@ export class GameManager {
                 // 根据配置创建地图
                 if (levelInfo.rowCounts && Array.isArray(levelInfo.rowCounts)) {
                     this.createMapRoundItemsWithRowCounts(levelInfo.rows, levelInfo.rowCounts);
+                } else if (levelInfo.rows && levelInfo.cols) {
+                    // 如果没有rowCounts，创建完整的rows×cols网格，所有格子都激活
+                    const rowCounts = new Array(levelInfo.rows).fill(levelInfo.cols);
+                    this.createMapRoundItemsWithRowCounts(levelInfo.rows, rowCounts);
                 }
 
                 resolve();
@@ -125,9 +129,10 @@ export class GameManager {
         });
     }
     /**
-     * 根据行数和每行的圆点数量创建 mapRoundItem（非规则布局，如菱形）
+     * 根据行数和每行的圆点数量创建 mapRoundItem（方形网格布局）
+     * 创建完整的rows×cols网格，但根据rowCounts来激活每行的某些格子
      * @param rows 总行数
-     * @param rowCounts 每行的圆点数量数组
+     * @param rowCounts 每行的圆点数量数组，表示每行激活的格子数量（从中间开始）
      */
     private createMapRoundItemsWithRowCounts(rows: number, rowCounts: number[]): void {
         if (!this.gameMapNode || !this.mapRoundItemPre) {
@@ -140,14 +145,24 @@ export class GameManager {
             return;
         }
 
+        // 获取最大列数（用于创建完整网格）
+        const maxCols = Math.max(...rowCounts);
+        if (maxCols <= 0) {
+            console.error('rowCounts中最大值为0，无法创建地图');
+            return;
+        }
+
         let totalItems = 0;
+        let activeItems = 0;
+
+        // 创建完整的rows×maxCols网格
         for (let row = 0; row < rows; row++) {
             const countInRow = rowCounts[row];
-            if (countInRow <= 0) continue;
-
+            
             // 计算当前行的起始X位置（居中）
-            const offsetX = -(countInRow - 1) * Macro.mapRoundHorizontalGap / 2;
-            for (let col = 0; col < countInRow; col++) {
+            const offsetX = -(maxCols - 1) * Macro.mapRoundHorizontalGap / 2;
+            
+            for (let col = 0; col < maxCols; col++) {
                 const itemNode = instantiate(this.mapRoundItemPre);
 
                 const x = offsetX + col * Macro.mapRoundHorizontalGap;
@@ -157,19 +172,32 @@ export class GameManager {
 
                 const mapRoundItemComp = itemNode.getComponent(mapRoundItem);
                 if (mapRoundItemComp) {
-                    mapRoundItemComp.initItem(row, col, x, y);
+                    // 判断当前格子是否在激活区域内
+                    // 从中间开始，左右各激活countInRow/2个格子（如果countInRow是奇数，中间多一个）
+                    const centerCol = Math.floor(maxCols / 2);
+                    const leftCount = Math.floor(countInRow / 2);
+                    const rightCount = countInRow - leftCount;
+                    const startCol = centerCol - leftCount;
+                    const endCol = centerCol + rightCount - 1;
+                    
+                    const isInMap = (col >= startCol && col <= endCol);
+                    
+                    mapRoundItemComp.initItem(row, col, x, y, isInMap);
                     this.roundItemsArr.push(mapRoundItemComp);
 
-                    // 记录坐标
-                    const key = `${row}_${col}`;
-                    this.roundItemPositions.set(key, { x, y });
+                    // 只记录激活的格子坐标
+                    if (isInMap) {
+                        const key = `${row}_${col}`;
+                        this.roundItemPositions.set(key, { x, y });
+                        activeItems++;
+                    }
                 }
                 totalItems++;
             }
         }
 
-        console.log(`成功创建 ${rows} 行非规则布局的 mapRoundItem，共 ${totalItems} 个`);
-        console.log(`每行圆点数量: [${rowCounts.join(', ')}]`);
+        console.log(`成功创建 ${rows} 行 × ${maxCols} 列的方形网格，共 ${totalItems} 个格子，激活 ${activeItems} 个`);
+        console.log(`每行激活的格子数量: [${rowCounts.join(', ')}]`);
     }
 
     /**
@@ -333,26 +361,6 @@ export class GameManager {
                     }
                 }
             } 
-            // else {
-            //     // 如果无法生成路径，至少创建一个单点路径（连接到相邻的已覆盖圆圈）
-            //     const adjacentCircles = this.findAdjacentCirclesByRowCol(row, col);
-            //     if (adjacentCircles.length > 0) {
-            //         const currentPos = this.getRoundItemPosition(row, col);
-            //         const nextCircle = adjacentCircles[0];
-            //         const nextPos = this.getRoundItemPosition(nextCircle.row, nextCircle.col);
-                    
-            //         if (currentPos && nextPos) {
-            //             const path = [
-            //                 { x: nextPos.x, y: nextPos.y },
-            //                 { x: currentPos.x, y: currentPos.y }
-            //             ];
-            //             this.arrowPaths.push(path);
-            //             this.pathLeftMap.push(false);
-            //             coveredCircles.add(circleKey);
-            //             coveredCircles.add(`${nextCircle.row}_${nextCircle.col}`);
-            //         }
-            //     }
-            // }
         }
     }
 
@@ -494,7 +502,6 @@ export class GameManager {
         // 第0行               0 1 
     /**
      * 根据行列查找相邻的圆圈（上下左右方向）
-     * 使用实际坐标来判断，确保路径不斜
      * @param row 当前行
      * @param col 当前列
      * @returns 相邻圆圈的行列信息数组
@@ -502,54 +509,41 @@ export class GameManager {
     private findAdjacentCirclesByRowCol(row: number, col: number): { row: number, col: number }[] {
         const adjacent: { row: number, col: number }[] = [];
         
-        // 获取当前圆圈的坐标
-        const currentPos = this.getRoundItemPosition(row, col);
-        if (!currentPos) {
-            return adjacent;
-        }
+        // 方形网格布局：直接通过row±1, col±1查找相邻格子
+        const directions = [
+            { row: row + 1, col: col },     // 上
+            { row: row - 1, col: col },     // 下
+            { row: row, col: col - 1 },     // 左
+            { row: row, col: col + 1 }      // 右
+        ];
 
-        const currentX = currentPos.x;
-        const currentY = currentPos.y;
-        const tolerance = 0.1; // 坐标容差
-        const horizontalGap = Macro.mapRoundHorizontalGap;
-        const verticalGap = Macro.maoRoundVerticalGap;
-
-        // 遍历所有圆圈，查找上下左右相邻的圆圈（使用实际坐标判断）
-        for (const [key, pos] of this.roundItemPositions.entries()) {
-            const [otherRow, otherCol] = key.split('_').map(Number);
-            
-            // 跳过自己
-            if (otherRow === row && otherCol === col) {
-                continue;
-            }
-
-            const dx = Math.abs(pos.x - currentX);
-            const dy = Math.abs(pos.y - currentY);
-
-            // 检查是否是上下左右相邻（使用实际坐标和间距判断）
-            // 上：x坐标相同（容差内），y = currentY + verticalGap
-            if (Math.abs(pos.x - currentX) < tolerance && 
-                Math.abs(pos.y - (currentY + verticalGap)) < tolerance) {
-                adjacent.push({ row: otherRow, col: otherCol });
-            }
-            // 下：x坐标相同（容差内），y = currentY - verticalGap
-            else if (Math.abs(pos.x - currentX) < tolerance && 
-                     Math.abs(pos.y - (currentY - verticalGap)) < tolerance) {
-                adjacent.push({ row: otherRow, col: otherCol });
-            }
-            // 左：y坐标相同（容差内），x = currentX - horizontalGap
-            else if (Math.abs(pos.y - currentY) < tolerance && 
-                     Math.abs(pos.x - (currentX - horizontalGap)) < tolerance) {
-                adjacent.push({ row: otherRow, col: otherCol });
-            }
-            // 右：y坐标相同（容差内），x = currentX + horizontalGap
-            else if (Math.abs(pos.y - currentY) < tolerance && 
-                     Math.abs(pos.x - (currentX + horizontalGap)) < tolerance) {
-                adjacent.push({ row: otherRow, col: otherCol });
+        for (const dir of directions) {
+            // 检查该位置是否存在且是激活的格子
+            if (this.hasRoundItem(dir.row, dir.col)) {
+                // 进一步检查该格子是否在map中（isInMap）
+                const item = this.getRoundItemByRowCol(dir.row, dir.col);
+                if (item && item.isInMap) {
+                    adjacent.push({ row: dir.row, col: dir.col });
+                }
             }
         }
 
         return adjacent;
+    }
+
+    /**
+     * 根据行列获取圆点组件
+     * @param row 行索引
+     * @param col 列索引
+     * @returns 圆点组件，如果不存在则返回null
+     */
+    private getRoundItemByRowCol(row: number, col: number): mapRoundItem | null {
+        for (const item of this.roundItemsArr) {
+            if (item.RoundIndex === row && item.ColMunIndex === col) {
+                return item;
+            }
+        }
+        return null;
     }
     /**
      * 箭头移动方法
@@ -609,9 +603,8 @@ export class GameManager {
 
                 // 计算点到线段的距离
                 const distance = this.pointToLineDistance(x, y, startX, startY, endX, endY);
-                // console.log('Jay点到线段距离', i, i + 1, distance);
                 if (distance <= hitDistance) {
-                    return pathIdx; // 点击到了这条路径
+                    return pathIdx; 
                 }
             }
         }

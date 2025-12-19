@@ -3,6 +3,7 @@
         {
             "level": 1,
             "rows": 15,
+            "cols": 17,
             "rowCounts": [
                 3,
                 5,
