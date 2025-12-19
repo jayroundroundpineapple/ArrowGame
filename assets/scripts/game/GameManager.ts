@@ -431,13 +431,12 @@ export class GameManager {
 
                 // 计算点到线段的距离
                 const distance = this.pointToLineDistance(x, y, startX, startY, endX, endY);
-                console.log('Jay点到线段距离', i, i + 1, distance);
+                // console.log('Jay点到线段距离', i, i + 1, distance);
                 if (distance <= hitDistance) {
                     return pathIdx; // 点击到了这条路径
                 }
             }
         }
-
         return -1; // 没有点击到任何路径
     }
 

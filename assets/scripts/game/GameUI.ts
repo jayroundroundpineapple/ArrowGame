@@ -57,16 +57,10 @@ export class GameUI extends Component {
      * 处理路径点击事件
      */
     private onPathTouch(event: EventTouch): void {
-        console.log('=== 点击事件触发 ===');
-        
         let touchWorldPos:Vec2 =event.getUILocation();
         let touchPos = this.gameMapNode.getComponent(UITransformComp).convertToNodeSpaceAR(new Vec3(touchWorldPos.x, touchWorldPos.y, 0));
         console.log('arrowGraphics世界坐标:', touchWorldPos.x, touchWorldPos.y);
-        // console.log('arrowGraphics本地坐标:', arrowLocalPos.x, arrowLocalPos.y);
         
-        // 由于arrowGraphics是gameMapNode的子节点，且位置是(0,0,0)
-        // 所以arrowGraphics的本地坐标就是gameMapNode的本地坐标
-        // 直接使用即可
         const finalX = touchPos.x;
         const finalY = touchPos.y;
         console.log('最终使用的坐标（gameMapNode坐标系）:', finalX, finalY);
@@ -88,35 +82,33 @@ export class GameUI extends Component {
             }
         }
         
-        // 手动检查第一个路径的第一个线段，看看距离是多少
-        if (arrowPaths.length > 0 && arrowPaths[0].length >= 2) {
-            const path = arrowPaths[0];
-            const startX = path[1].x;
-            const startY = path[1].y;
-            const endX = path[0].x;
-            const endY = path[0].y;
-            
-            if (startX !== null && startY !== null && endX !== null && endY !== null) {
-                const dx = finalX - startX;
-                const dy = finalY - startY;
-                const distToStart = Math.sqrt(dx * dx + dy * dy);
-                console.log(`测试：点击点到路径0第一个线段起点的距离: ${distToStart.toFixed(2)}`);
-                console.log(`      线段起点: (${startX}, ${startY}), 终点: (${endX}, ${endY})`);
-            } else {
-                console.log('路径0的点包含null值！');
-            }
-        }
         const hitPathIdx = this.gameManager.checkPathHit(finalX, finalY, 10);
         
         if (hitPathIdx >= 0) {
             console.log('✓ 点击到路径:', hitPathIdx);
+            //这里要判断路径是否可以走，如果旁边有其他路径挡住，就不能移动
+            const path = this.gameManager.getArrowPaths()[hitPathIdx];
+            const startX = path[1].x;
+            const startY = path[1].y;
+            const endX = path[0].x;
+            const endY = path[0].y;
+            //获取路径方向
+            const dir = this.gameManager.getDir(startX, startY, endX, endY);
+            console.log('当前路径方向:', dir);
+            //找到方向下的下一个点，是否被其他路径挡住
+            const nextX = endX + dir.x * Macro.mapRoundHorizontalGap;
+            const nextY = endY + dir.y * Macro.maoRoundVerticalGap;
+            const nextPathIdx = this.gameManager.checkPathHit(nextX, nextY, 10);
+            if (nextPathIdx >= 0) {
+                console.log('路径被其他路径挡住');
+                return;
+            }
             // 点击到了路径，开始移动
             this.startPathMovement(hitPathIdx);
             console.log(`开始移动路径 ${hitPathIdx}`);
         } else {
-            console.log('✗ 未点击到任何路径');
+            console.log('未点击到任何路径');
         }
-        console.log('=== 点击事件结束 ===\n');
     }
 
     /**
