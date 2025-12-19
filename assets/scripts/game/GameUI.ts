@@ -31,7 +31,7 @@ export class GameUI extends Component {
         // 加载关卡
         await this.gameManager.loadLevel(1);
         // 初始化箭头路径
-        this.gameManager.initArrows();
+        this.gameManager.initArrowPaths();
         // 绘制箭头
         this.draw();
         
@@ -194,7 +194,7 @@ export class GameUI extends Component {
 
         this.arrowGraphics.clear();
         this.arrowGraphics.lineCap = Graphics.LineCap.ROUND;
-        this.arrowGraphics.lineWidth = 8;
+        this.arrowGraphics.lineWidth = 12;
         this.arrowGraphics.strokeColor = new Color(0, 0, 0, 255);
         this.arrowGraphics.fillColor = new Color(0, 0, 0, 255);
 

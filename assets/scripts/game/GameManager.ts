@@ -118,52 +118,12 @@ export class GameManager {
                 // 根据配置创建地图
                 if (levelInfo.rowCounts && Array.isArray(levelInfo.rowCounts)) {
                     this.createMapRoundItemsWithRowCounts(levelInfo.rows, levelInfo.rowCounts);
-                } else {
-                    this.createMapRoundItems(levelInfo.rows, levelInfo.cols);
                 }
 
                 resolve();
             });
         });
     }
-
-    /**
-     * 根据行数和列数创建 mapRoundItem（规则布局）
-     * @param rows 行数
-     * @param cols 列数
-     */
-    private createMapRoundItems(rows: number, cols: number): void {
-        if (!this.gameMapNode || !this.mapRoundItemPre) {
-            console.error('gameMapNode 或 mapRoundItemPre 未设置');
-            return;
-        }
-
-        const totalRows = this.levelData.rows;
-        const totalCols = this.levelData.cols;
-
-        // 遍历创建每个圆点
-        for (let row = 0; row < rows; row++) {
-            for (let col = 0; col < cols; col++) {
-                const itemNode = instantiate(this.mapRoundItemPre);
-                const x = (col - Math.floor(totalCols / 2)) * Macro.mapRoundHorizontalGap;
-                const y = (row * Macro.maoRoundVerticalGap);
-                itemNode.setPosition(new Vec3(x, y, 0));
-                itemNode.setParent(this.gameMapNode);
-
-                const mapRoundItemComp = itemNode.getComponent(mapRoundItem);
-                if (mapRoundItemComp) {
-                    mapRoundItemComp.initItem(row, col, x, y);
-                    this.roundItemsArr.push(mapRoundItemComp);
-
-                    // 记录坐标
-                    const key = `${row}_${col}`;
-                    this.roundItemPositions.set(key, { x, y });
-                }
-            }
-        }
-        console.log(`成功创建 ${rows} 行 ${cols} 列的 mapRoundItem，共 ${rows * cols} 个`);
-    }
-
     /**
      * 根据行数和每行的圆点数量创建 mapRoundItem（非规则布局，如菱形）
      * @param rows 总行数
@@ -214,38 +174,174 @@ export class GameManager {
 
     /**
      * 初始化箭头路径
+     * 自动生成多条路径，覆盖所有圆圈，路径只能上下左右方向
      */
-    public initArrows(): void {
+    public initArrowPaths(): void {
         // 清空之前的路径
         this.arrowPaths = [];
         this.pathLeftMap = []; // 清空离开状态数组
 
-        // 示例：设置多条箭头路径，每条路径方向不同，弯弯曲曲的长路径
-        // 路径1：向上箭头 - 先向右，再向上，再向左，再向上
-        this.arrowPaths.push([
-            { x: this.getRoundItemX(0, 1), y: this.getRoundItemY(0, 1) }, //箭头位置
-            { x: this.getRoundItemX(1, 2), y: this.getRoundItemY(1, 2) },
-            { x: this.getRoundItemX(1, 1), y: this.getRoundItemY(1, 1) },
-            { x: this.getRoundItemX(2, 2), y: this.getRoundItemY(2, 2) },
-        ]);
-        this.pathLeftMap.push(false); // 初始化第一条路径为未离开
+        // 用于跟踪哪些圆圈已经被路径覆盖（使用行列key）
+        const coveredCircles = new Set<string>();
 
-        // 第14行              0 1 
-        // 第13行            0 1 2 3 
-        // 第12行          0 1 2 3 4 05
-        // 第11行        0 1 2 3 4 5 06 07
-        // 第10行      0 1 2 3 4 5 6 07 08 09
-        // 第9行     0 1 2 3 4 5 6 7 08 09 10 11
-        // 第8行   0 1 2 3 4 5 6 7 8 09 10 11 12 13
-        // 第7行 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
-        // 第6行   0 1 2 3 4 5 6 7 8 9 10 11 12 13
-        // 第5行     0 1 2 3 4 5 6 7 8 9 10 11
-        // 第4行       0 1 2 3 4 5 6 7 8 9
-        // 第3行         0 1 2 3 4 5 6 8
-        // 第2行           0 1 2 3 4 5
-        // 第1行             0 1 2 3 
-        // 第0行               0 1 
-        console.log('箭头路径初始化完成');
+        // 获取所有圆圈的行列信息
+        const allCircles: { row: number, col: number, x: number, y: number }[] = [];
+        for (const [key, pos] of this.roundItemPositions.entries()) {
+            const [row, col] = key.split('_').map(Number);
+            allCircles.push({ row, col, x: pos.x, y: pos.y });
+        }
+      
+        // 为每个未覆盖的圆圈生成路径
+        for (const circle of allCircles) {
+            const circleKey = `${circle.row}_${circle.col}`;
+            
+            // 如果这个圆圈已经被覆盖，跳过
+            if (coveredCircles.has(circleKey)) {
+                continue;
+            }
+
+            // 尝试生成一条路径
+            const path = this.generatePathFromCircle(circle.row, circle.col, coveredCircles);
+
+            if (path && path.length >= 2) {
+                this.arrowPaths.push(path);
+                this.pathLeftMap.push(false);
+                
+                // 标记路径上的所有圆圈为已覆盖
+                for (const point of path) {
+                    // 通过坐标找到对应的行列
+                    for (const [key, pos] of this.roundItemPositions.entries()) {
+                        if (Math.abs(pos.x - point.x) < 0.1 && Math.abs(pos.y - point.y) < 0.1) {
+                            coveredCircles.add(key);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        console.log(`箭头路径初始化完成，共生成 ${this.arrowPaths.length} 条路径`);
+        console.log(`覆盖了 ${coveredCircles.size} 个圆圈，总共 ${allCircles.length} 个圆圈`);
+    }
+
+    /**
+     * 从指定圆圈生成一条路径（只能上下左右方向）
+     * @param startRow 起始行
+     * @param startCol 起始列
+     * @param coveredCircles 已覆盖的圆圈集合
+     * @returns 生成的路径点数组（反向存储：从尾部到头部）
+     */
+    private generatePathFromCircle(
+        startRow: number, 
+        startCol: number, 
+        coveredCircles: Set<string>
+    ): { x: number, y: number }[] | null {
+        const path: { x: number, y: number }[] = [];
+        const visited = new Set<string>();
+        
+        let currentRow = startRow;
+        let currentCol = startCol;
+        const startKey = `${currentRow}_${currentCol}`;
+        
+        // 检查起始点是否存在
+        const startPos = this.getRoundItemPosition(currentRow, currentCol);
+        if (!startPos) {
+            return null;
+        }
+
+        path.push({ x: startPos.x, y: startPos.y });
+        visited.add(startKey);
+
+        // 尝试延伸路径，最多连接3-7个圆圈
+        const maxLength = 3 + Math.floor(Math.random() * 5); // 3-7个圆圈
+
+        while (path.length < maxLength) {
+            // 查找当前点的相邻圆圈（上下左右方向）
+            const adjacentCircles = this.findAdjacentCirclesByRowCol(currentRow, currentCol);
+
+            // 过滤掉已访问和已覆盖的圆圈
+            const availableCircles = adjacentCircles.filter(circle => {
+                const circleKey = `${circle.row}_${circle.col}`;
+                return !visited.has(circleKey) && !coveredCircles.has(circleKey);
+            });
+
+            if (availableCircles.length === 0) {
+                break; // 没有可用的相邻圆圈，停止延伸
+            }
+
+            // 随机选择一个相邻圆圈
+            const nextCircle = availableCircles[Math.floor(Math.random() * availableCircles.length)];
+            const nextKey = `${nextCircle.row}_${nextCircle.col}`;
+            const nextPos = this.getRoundItemPosition(nextCircle.row, nextCircle.col);
+
+            if (nextPos) {
+                path.push({ x: nextPos.x, y: nextPos.y });
+                visited.add(nextKey);
+                currentRow = nextCircle.row;
+                currentCol = nextCircle.col;
+            } else {
+                break;
+            }
+        }
+
+        // 如果路径长度小于2，返回null
+        if (path.length < 2) {
+            return null;
+        }
+
+        // 路径需要反向存储（从尾部到头部），因为绘制时是从尾部到头部
+        return path.reverse();
+    }
+
+    /**
+     * 根据行列查找相邻的圆圈（上下左右方向）
+     * @param row 当前行
+     * @param col 当前列
+     * @returns 相邻圆圈的行列信息数组
+     */
+    private findAdjacentCirclesByRowCol(row: number, col: number): { row: number, col: number }[] {
+        const adjacent: { row: number, col: number }[] = [];
+
+        // 检查四个方向：上、下、左、右
+        //行数上升列数递增情况：
+        let directions = [
+            { rowOffset: 1, colOffset: 1 }, // 上（行+1）
+            { rowOffset: -1, colOffset: -1 },  // 下（行-1）
+            { rowOffset: 0, colOffset: -1 }, // 左（列减1）
+            { rowOffset: 0, colOffset: 1 }, // 右（列加1）
+        ];
+        //行数上升列数递减情况：
+        let directions2 = [
+            { rowOffset: 1, colOffset: -1 }, // 上（行+1）
+            { rowOffset: -1, colOffset: 1 },  // 下（行-1）
+            { rowOffset: 0, colOffset: -1 }, // 左（列加1）
+            { rowOffset: 0, colOffset: 1 }, // 右（列减1）
+        ];
+        //刚好在中间列，上方是递减，下方是递增
+        let direction3 = [
+            { rowOffset: 1, colOffset: -1 }, // 上（行-1）
+            { rowOffset: -1, colOffset: 1 },  // 下（行+1）
+            { rowOffset: 0, colOffset: -1 }, // 左（列减1）
+            { rowOffset: 0, colOffset: 1 }, // 右（列加1）
+        ]
+        if(row >Math.floor(this.levelData.rows / 2)){
+            directions = directions2;
+        }
+        if(row == Math.floor(this.levelData.rows / 2)){
+            directions = direction3;
+        }
+
+        for (const dir of directions) {
+            const nextRow = row + dir.rowOffset;
+            const nextCol = col + dir.colOffset;
+
+            // 检查下一个位置是否存在圆圈
+            if (this.hasRoundItem(nextRow, nextCol)) {
+                adjacent.push({ row: nextRow, col: nextCol });
+            }
+        }
+
+        return adjacent;
     }
     /**
      * 箭头移动方法
