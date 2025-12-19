@@ -559,6 +559,87 @@ export class GameManager {
     }
 
     /**
+     * 检查指定坐标是否存在圆点（通过坐标查找）
+     * @param x X坐标
+     * @param y Y坐标
+     * @returns 是否存在圆点
+     */
+    public hasRoundItemByPosition(x: number, y: number): boolean {
+        const tolerance = 0.1;
+        for (const pos of this.roundItemPositions.values()) {
+            if (Math.abs(pos.x - x) < tolerance && Math.abs(pos.y - y) < tolerance) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 检查路径在指定方向上是否被其他路径阻挡
+     * 沿着箭头方向递归检查，直到遇到非地图圆圈的位置
+     * @param pathIdx 当前路径索引
+     * @param direction 箭头方向 {x, y}
+     * @returns true表示被阻挡，false表示可以移动
+     */
+    public isPathBlocked(pathIdx: number, direction: { x: number, y: number }): boolean {
+        if (pathIdx < 0 || pathIdx >= this.arrowPaths.length) {
+            return true;
+        }
+
+        const path = this.arrowPaths[pathIdx];
+        if (!path || path.length < 2) {
+            return true;
+        }
+
+        if (direction.x === 0 && direction.y === 0) {
+            return false;
+        }
+
+        const headX = path[0].x;
+        const headY = path[0].y;
+
+        const horizontalGap = Macro.mapRoundHorizontalGap;
+        const verticalGap = Macro.maoRoundVerticalGap;
+
+        // 沿着箭头方向递归检查，直到遇到非地图圆圈的位置
+        let checkX = headX;
+        let checkY = headY;
+        let step = 0;
+        const maxSteps = 50; // 防止无限循环，增加步数以覆盖更大的地图
+
+        while (step < maxSteps) {
+            if (direction.x !== 0) {
+                checkX = headX + direction.x * horizontalGap * (step + 1);
+                checkY = headY;
+            } else if (direction.y !== 0) {
+                checkX = headX;
+                checkY = headY + direction.y * verticalGap * (step + 1);
+            } else {
+                break;
+            }
+
+            const isMapCircle = this.hasRoundItemByPosition(checkX, checkY);
+            if (!isMapCircle) {
+                // 如果已经不是地图圆圈，说明已经检查完整个方向，没有阻挡
+                console.log(`路径 ${pathIdx} 在方向 (${direction.x}, ${direction.y}) 上检查到第 ${step + 1} 步，已超出地图范围，无阻挡`);
+                return false;
+            }
+
+            // 如果还是地图圆圈，检查这个位置是否有其他路径（除了当前路径）
+            const BlockedPathIdx = this.checkPathHit(checkX,checkY,5)
+            if(BlockedPathIdx >= 0 && BlockedPathIdx !== pathIdx && !this.pathLeftMap[BlockedPathIdx]){
+                console.log(`被路径 ${BlockedPathIdx} 阻挡`);
+                return true;
+            }
+            step++;
+        }
+
+        // 如果检查了maxSteps次还是地图圆圈，说明可能有问题，返回false允许移动
+        console.warn(`路径 ${pathIdx} 方向检查达到最大步数 ${maxSteps}，允许移动`);
+        return false;
+    }
+
+    /**
      * 获取箭头路径数组
      */
     public getArrowPaths(): { x: number, y: number }[][] {

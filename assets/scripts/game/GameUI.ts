@@ -75,9 +75,9 @@ export class GameUI extends Component {
             for (let j = 0; j < path.length; j++) {
                 const point = path[j];
                 if (point && point.x !== null && point.y !== null) {
-                    console.log(`  点 ${j}: (${point.x}, ${point.y})`);
+                    console.log(`点 ${j}: (${point.x}, ${point.y})`);
                 } else {
-                    console.log(`  点 ${j}: null或无效`);
+                    console.log(`点 ${j}: null或无效`);
                 }
             }
         }
@@ -86,23 +86,29 @@ export class GameUI extends Component {
         
         if (hitPathIdx >= 0) {
             console.log('✓ 点击到路径:', hitPathIdx);
-            //这里要判断路径是否可以走，如果旁边有其他路径挡住，就不能移动
+            
+            // 获取路径方向
             const path = this.gameManager.getArrowPaths()[hitPathIdx];
+            if (!path || path.length < 2) {
+                console.log('路径无效');
+                return;
+            }
+
             const startX = path[1].x;
             const startY = path[1].y;
             const endX = path[0].x;
             const endY = path[0].y;
-            //获取路径方向
+            
+            // 获取路径方向
             const dir = this.gameManager.getDir(startX, startY, endX, endY);
             console.log('当前路径方向:', dir);
-            //找到方向下的下一个点，是否被其他路径挡住
-            const nextX = endX + dir.x * Macro.mapRoundHorizontalGap;
-            const nextY = endY + dir.y * Macro.maoRoundVerticalGap;
-            const nextPathIdx = this.gameManager.checkPathHit(nextX, nextY, 10);
-            if (nextPathIdx >= 0) {
-                console.log('路径被其他路径挡住');
+            
+            // 检查路径在箭头方向上是否被其他路径阻挡（递归检查整行/整列）
+            if (this.gameManager.isPathBlocked(hitPathIdx, dir)) {
+                console.log('路径被其他路径挡住，无法移动');
                 return;
             }
+            
             // 点击到了路径，开始移动
             this.startPathMovement(hitPathIdx);
             console.log(`开始移动路径 ${hitPathIdx}`);
