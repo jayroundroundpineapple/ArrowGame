@@ -174,15 +174,13 @@ export class GameManager {
 
     /**
      * 初始化箭头路径
-     * 自动生成多条路径，覆盖所有圆圈，路径只能上下左右方向
+     * 优先从配置文件中读取路径，如果没有配置则自动生成
+     * 确保所有圆圈都被路径覆盖
      */
     public initArrowPaths(): void {
         // 清空之前的路径
         this.arrowPaths = [];
         this.pathLeftMap = []; // 清空离开状态数组
-
-        // 用于跟踪哪些圆圈已经被路径覆盖（使用行列key）
-        const coveredCircles = new Set<string>();
 
         // 获取所有圆圈的行列信息
         const allCircles: { row: number, col: number, x: number, y: number }[] = [];
@@ -195,17 +193,186 @@ export class GameManager {
             console.warn('没有找到任何圆圈，无法生成路径');
             return;
         }
-      
-        // 第一轮：为每个未覆盖的圆圈生成路径
+
+        // 优先从配置文件中读取路径
+        if (this.levelData && this.levelData.arrowPaths && this.levelData.arrowPaths.length) {
+            this.loadArrowPathsFromConfig(this.levelData.arrowPaths, allCircles);
+        } 
+        else {
+            // 如果没有配置，自动生成路径
+            this.generateArrowPathsAutomatically(allCircles);
+        }
+    }
+
+    /**
+     * 从配置文件中加载箭头路径
+     * @param configPaths 配置文件中的路径数组，每条路径是 {row, col} 数组
+     * @param allCircles 所有圆圈信息
+     */
+    private loadArrowPathsFromConfig(
+        configPaths: { row: number, col: number }[][],
+        allCircles: { row: number, col: number, x: number, y: number }[]
+    ): void {
+        const coveredCircles = new Set<string>();
+        const invalidPaths: number[] = [];
+
+        // 遍历配置中的每条路径
+        for (let pathIdx = 0; pathIdx < configPaths.length; pathIdx++) {
+            const configPath = configPaths[pathIdx];
+            
+            if (!Array.isArray(configPath) || configPath.length < 2) {
+                console.warn(`路径 ${pathIdx} 配置无效，至少需要2个点`);
+                invalidPaths.push(pathIdx);
+                continue;
+            }
+
+            // 将配置中的 {row, col} 转换为坐标路径
+            const path: { x: number, y: number }[] = [];
+            let isValid = true;
+
+            for (const point of configPath) {
+                if (point.row === undefined || point.col === undefined) {
+                    console.warn(`路径 ${pathIdx} 中的点配置无效，缺少 row 或 col`);
+                    isValid = false;
+                    break;
+                }
+
+                const pos = this.getRoundItemPosition(point.row, point.col);
+                if (!pos) {
+                    console.warn(`路径 ${pathIdx} 中的点 (${point.row}, ${point.col}) 不存在于地图中`);
+                    isValid = false;
+                    break;
+                }
+
+                path.push({ x: pos.x, y: pos.y });
+            }
+
+            if (!isValid || path.length < 2) {
+                invalidPaths.push(pathIdx);
+                continue;
+            }
+
+            // 验证路径方向（只能上下左右）
+            let pathValid = true;
+            for (let i = 0; i < path.length - 1; i++) {
+                const dir = this.getDir(path[i + 1].x, path[i + 1].y, path[i].x, path[i].y);
+                if (dir.x === 0 && dir.y === 0) {
+                    console.warn(`路径 ${pathIdx} 的第 ${i} 段是斜线或无效方向`);
+                    pathValid = false;
+                    break;
+                }
+            }
+
+            if (!pathValid) {
+                invalidPaths.push(pathIdx);
+                continue;
+            }
+
+            // 路径需要反向存储（从尾部到头部），因为绘制时是从尾部到头部
+            this.arrowPaths.push(path.reverse());
+            this.pathLeftMap.push(false);
+
+            // 标记路径上的所有圆圈为已覆盖
+            for (const point of configPath) {
+                const circleKey = `${point.row}_${point.col}`;
+                coveredCircles.add(circleKey);
+            }
+        }
+
+        if (invalidPaths.length > 0) {
+            console.warn(`有 ${invalidPaths.length} 条路径配置无效，已跳过`);
+        }
+
+        // 检查是否所有圆圈都被覆盖
+        const uncoveredCircles: string[] = [];
         for (const circle of allCircles) {
             const circleKey = `${circle.row}_${circle.col}`;
-            
-            // 如果这个圆圈已经被覆盖，跳过
+            if (!coveredCircles.has(circleKey)) {
+                uncoveredCircles.push(circleKey);
+            }
+        }
+
+        // if (uncoveredCircles.length > 0) {
+        //     console.warn(`警告：仍有 ${uncoveredCircles.length} 个圆圈未被路径覆盖:`, uncoveredCircles);
+        //     // 为未覆盖的圆圈自动生成路径
+        //     this.fillUncoveredCircles(uncoveredCircles, coveredCircles);
+        // }
+
+        console.log(`从配置文件加载了 ${this.arrowPaths.length} 条路径`);
+        console.log(`覆盖了 ${coveredCircles.size} 个圆圈，总共 ${allCircles.length} 个圆圈`);
+    }
+
+    /**
+     * 为未覆盖的圆圈自动生成路径
+     * @param uncoveredCircleKeys 未覆盖的圆圈key数组
+     * @param coveredCircles 已覆盖的圆圈集合
+     */
+    private fillUncoveredCircles(
+        uncoveredCircleKeys: string[],
+        coveredCircles: Set<string>
+    ): void {
+        for (const circleKey of uncoveredCircleKeys) {
             if (coveredCircles.has(circleKey)) {
                 continue;
             }
 
-            // 尝试生成一条路径
+            const [row, col] = circleKey.split('_').map(Number);
+            const path = this.generatePathFromCircle(row, col, coveredCircles);
+
+            if (path && path.length >= 2) {
+                this.arrowPaths.push(path);
+                this.pathLeftMap.push(false);
+
+                // 标记路径上的所有圆圈为已覆盖
+                for (const point of path) {
+                    for (const [key, pos] of this.roundItemPositions.entries()) {
+                        if (Math.abs(pos.x - point.x) < 0.1 && Math.abs(pos.y - point.y) < 0.1) {
+                            coveredCircles.add(key);
+                            break;
+                        }
+                    }
+                }
+            } 
+            // else {
+            //     // 如果无法生成路径，至少创建一个单点路径（连接到相邻的已覆盖圆圈）
+            //     const adjacentCircles = this.findAdjacentCirclesByRowCol(row, col);
+            //     if (adjacentCircles.length > 0) {
+            //         const currentPos = this.getRoundItemPosition(row, col);
+            //         const nextCircle = adjacentCircles[0];
+            //         const nextPos = this.getRoundItemPosition(nextCircle.row, nextCircle.col);
+                    
+            //         if (currentPos && nextPos) {
+            //             const path = [
+            //                 { x: nextPos.x, y: nextPos.y },
+            //                 { x: currentPos.x, y: currentPos.y }
+            //             ];
+            //             this.arrowPaths.push(path);
+            //             this.pathLeftMap.push(false);
+            //             coveredCircles.add(circleKey);
+            //             coveredCircles.add(`${nextCircle.row}_${nextCircle.col}`);
+            //         }
+            //     }
+            // }
+        }
+    }
+
+    /**
+     * 自动生成箭头路径（当配置文件中没有路径配置时使用）
+     * @param allCircles 所有圆圈信息
+     */
+    private generateArrowPathsAutomatically(
+        allCircles: { row: number, col: number, x: number, y: number }[]
+    ): void {
+        const coveredCircles = new Set<string>();
+
+        // 为每个未覆盖的圆圈生成路径
+        for (const circle of allCircles) {
+            const circleKey = `${circle.row}_${circle.col}`;
+            
+            if (coveredCircles.has(circleKey)) {
+                continue;
+            }
+
             const path = this.generatePathFromCircle(circle.row, circle.col, coveredCircles);
 
             if (path && path.length >= 2) {
@@ -214,7 +381,6 @@ export class GameManager {
                 
                 // 标记路径上的所有圆圈为已覆盖
                 for (const point of path) {
-                    // 通过坐标找到对应的行列
                     for (const [key, pos] of this.roundItemPositions.entries()) {
                         if (Math.abs(pos.x - point.x) < 0.1 && Math.abs(pos.y - point.y) < 0.1) {
                             coveredCircles.add(key);
@@ -224,10 +390,22 @@ export class GameManager {
                 }
             }
         }
-        // 检查是否还有未覆盖的圆圈
-        if (coveredCircles.size < allCircles.length) {
-            console.warn(`警告：仍有 ${allCircles.length - coveredCircles.size} 个圆圈未被覆盖`);
+
+        // 处理剩余的未覆盖圆圈
+        const uncoveredCircles: string[] = [];
+        for (const circle of allCircles) {
+            const circleKey = `${circle.row}_${circle.col}`;
+            if (!coveredCircles.has(circleKey)) {
+                uncoveredCircles.push(circleKey);
+            }
         }
+
+        if (uncoveredCircles.length > 0) {
+            this.fillUncoveredCircles(uncoveredCircles, coveredCircles);
+        }
+
+        console.log(`自动生成了 ${this.arrowPaths.length} 条路径`);
+        console.log(`覆盖了 ${coveredCircles.size} 个圆圈，总共 ${allCircles.length} 个圆圈`);
     }
 
     /**

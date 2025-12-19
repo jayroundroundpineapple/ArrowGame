@@ -20,15 +20,31 @@
                 5,
                 3
             ],
-            "imagePath": "images/pintu/pic1/spriteFrame",
-            "isHardTip": false
+            "isHardTip": false,
+            "arrowPaths": null
         },
         {
             "level": 2,
             "rows": 3,
             "cols": 3,
-            "imagePath": "images/pintu/pic2/spriteFrame",
-            "isHardTip": false
+            "isHardTip": false,
+            "arrowPaths": [
+                [
+                    {"row": 0, "col": 0},
+                    {"row": 0, "col": 1},
+                    {"row": 0, "col": 2}
+                ],
+                [
+                    {"row": 1, "col": 0},
+                    {"row": 1, "col": 1},
+                    {"row": 1, "col": 2}
+                ],
+                [
+                    {"row": 2, "col": 0},
+                    {"row": 2, "col": 1},
+                    {"row": 2, "col": 2}
+                ]
+            ]
         }
     ]
 }
