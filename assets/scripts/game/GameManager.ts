@@ -115,13 +115,8 @@ export class GameManager {
                 this.levelData = levelInfo;
                 // 根据配置创建地图
                 if (levelInfo.rowCounts && Array.isArray(levelInfo.rowCounts)) {
-                    this.createMapRoundItemsWithRowCounts(levelInfo.rows, levelInfo.rowCounts);
-                } else if (levelInfo.rows && levelInfo.cols) {
-                    // 如果没有rowCounts，创建完整的rows×cols网格，所有格子都激活
-                    const rowCounts = new Array(levelInfo.rows).fill(levelInfo.cols);
-                    this.createMapRoundItemsWithRowCounts(levelInfo.rows, rowCounts);
-                }
-
+                    this.createMapRoundItemsWithRowCounts(levelInfo.rowCounts.length, levelInfo.rowCounts);
+                } 
                 resolve();
             });
         });
@@ -143,17 +138,10 @@ export class GameManager {
             return;
         }
 
-        // 获取最大列数（用于创建完整网格）
         const maxCols = Math.max(...rowCounts);
-        if (maxCols <= 0) {
-            console.error('rowCounts中最大值为0，无法创建地图');
-            return;
-        }
-
         let totalItems = 0;
         let activeItems = 0;
 
-        // 创建完整的rows×maxCols网格
         for (let row = 0; row < rows; row++) {
             const countInRow = rowCounts[row];
             
@@ -559,13 +547,11 @@ export class GameManager {
                 this.arrowPaths[pathIdx].pop();//删除尾部
             }
         }
-        
         // 检查路径是否已离开地图
         const path = this.arrowPaths[pathIdx];
         let shouldLeave = false;
         
         if (!path || path.length <= 1) {
-            // 路径长度 <= 1，肯定已离开
             shouldLeave = true;
         } else if (path.length === 2) {
             // 路径长度为2时，根据移动方向检查是否超出边界值
@@ -681,8 +667,6 @@ export class GameManager {
         const dy = py - yy;
         return Math.sqrt(dx * dx + dy * dy);
     }
-
-    // ========== Getter/Setter ==========
 
     /**
      * 获取当前关卡数据
