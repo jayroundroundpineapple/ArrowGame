@@ -22,7 +22,9 @@
                 3
             ],
             "isHardTip": false,
-            "arrowPaths": null
+            "arrowPaths": [
+               
+            ]
         },
         {
             "level": 2,

@@ -149,17 +149,16 @@ export class GameManager {
             const offsetX = -(maxCols - 1) * Macro.mapRoundHorizontalGap / 2;
             
             for (let col = 0; col < maxCols; col++) {
+                //创建N*N格子地图，但是只激活特定格子
                 const itemNode = instantiate(this.mapRoundItemPre);
 
                 const x = offsetX + col * Macro.mapRoundHorizontalGap;
                 const y = row * Macro.maoRoundVerticalGap;
                 itemNode.setPosition(new Vec3(x, y, 0));
                 itemNode.setParent(this.gameMapNode);
-
                 const mapRoundItemComp = itemNode.getComponent(mapRoundItem);
                 if (mapRoundItemComp) {
                     // 判断当前格子是否在激活区域内
-                    // 从中间开始，左右各激活countInRow/2个格子（如果countInRow是奇数，中间多一个）
                     const centerCol = Math.floor(maxCols / 2);
                     const leftCount = Math.floor(countInRow / 2);
                     const rightCount = countInRow - leftCount;

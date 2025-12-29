@@ -158,7 +158,6 @@ export class GameUI extends Component {
         graphicsNode.name = `ArrowPath_${pathIndex}`;
         graphicsNode.setParent(this.graphicsContainer);
         graphicsNode.setPosition(new Vec3(0, 0, 0));
-
         let graphics = graphicsNode.getComponent(Graphics);
 
         // 设置 Graphics 属性
@@ -169,7 +168,6 @@ export class GameUI extends Component {
         graphics.strokeColor = new Color(0, 0, 0, 255);
         graphics.fillColor = new Color(0, 0, 0, 255);
 
-        // 如果预制体有 GraphicsItem 组件，可以调用初始化方法
         const graphicsItem = graphicsNode.getComponent(GraphicsItem);
         if (graphicsItem && graphicsItem.initItem) {
             graphicsItem.initItem();
@@ -180,10 +178,7 @@ export class GameUI extends Component {
             this.pathGraphics.push(null);
         }
         this.pathGraphics[pathIndex] = graphics;
-
-        // 绘制路径
         this.drawPath(pathIndex);
-
         return graphics;
     }
 
@@ -313,13 +308,7 @@ export class GameUI extends Component {
      */
     private hidePathGraphics(pathIndex: number): void {
         if (this.pathGraphics[pathIndex] && this.pathGraphics[pathIndex].node) {
-            // 方式1：设置透明度为0
-            // this.pathGraphics[pathIndex].node.getComponent(UIOpacity).opacity = 0;
-
-            // 方式2：直接隐藏节点（推荐）
             this.pathGraphics[pathIndex].node.active = false;
-
-            // 也可以清空绘制内容
             this.pathGraphics[pathIndex].clear();
         }
     }
