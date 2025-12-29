@@ -148,10 +148,9 @@ export class GameUI extends Component {
     update(deltaTime: number): void {
         if (this.isMoving && this.movingPathIndex >= 0) {
             // 移动路径
-            this.gameManager.arrowPathMove(5, this.movingPathIndex);
+            this.gameManager.arrowPathMove(8, this.movingPathIndex);
             // 重新绘制
             this.draw();
-
             // 检查路径是否已离开地图
             if (this.gameManager.isPathLeftMap(this.movingPathIndex)) {
                 const leftPathIdx = this.movingPathIndex; // 保存路径索引用于日志
@@ -181,11 +180,16 @@ export class GameUI extends Component {
         this.arrowGraphics.strokeColor = new Color(0, 0, 0, 255);
         this.arrowGraphics.fillColor = new Color(0, 0, 0, 255);
 
+        // 获取路径离开地图状态
+        const pathLeftMap = this.gameManager.getPathLeftMap();
+        
         // 遍历所有路径
         for (let pathIndex = 0; pathIndex < arrowPaths.length; pathIndex++) {
             const path = arrowPaths[pathIndex];
-            // 至少需要2个点才能绘制
-            if (path.length < 2) continue;
+            // 如果路径已离开地图，跳过绘制（实现消除效果）
+            if (pathLeftMap[pathIndex] === true) continue;
+            // 如果路径为空或长度小于2，跳过绘制
+            if (!path || path.length < 2) continue;
 
             // 遍历当前路径的点，绘制每段线段
             for (let i = 0; i < path.length - 1; i++) {

@@ -318,14 +318,6 @@ export class GameManager {
                 uncoveredCircles.push(circleKey);
             }
         }
-
-        // if (uncoveredCircles.length > 0) {
-        //     console.warn(`警告：仍有 ${uncoveredCircles.length} 个圆圈未被路径覆盖:`, uncoveredCircles);
-        //     // 为未覆盖的圆圈自动生成路径
-        //     this.fillUncoveredCircles(uncoveredCircles, coveredCircles);
-        // }
-        // console.log(`从配置文件加载了 ${this.arrowPaths.length} 条路径`);
-        // console.log(`覆盖了 ${coveredCircles.size} 个圆圈，总共 ${allCircles.length} 个圆圈`);
     }
 
     /**
@@ -569,9 +561,14 @@ export class GameManager {
                 this.arrowPaths[pathIdx].pop();//删除尾部
             }
         }
-        if (this.arrowPaths[pathIdx].length <= 1) {
-            console.log(`路径${pathIdx}已经离开地图`);
-            this.pathLeftMap[pathIdx] = true;      
+        
+        // 当路径长度 <= 1 时，立即清空路径数组并标记为已离开
+        if (!this.arrowPaths[pathIdx] || this.arrowPaths[pathIdx].length <= 1) {
+            console.log(`路径${pathIdx}已经离开地图，清空路径`);
+            // 清空路径数组，确保不再绘制任何点
+            this.arrowPaths[pathIdx] = [];
+            // 标记为已离开地图
+            this.pathLeftMap[pathIdx] = true;
         }
     }
     /**
