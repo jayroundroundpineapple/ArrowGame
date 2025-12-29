@@ -71,7 +71,6 @@ export class GameUI extends Component {
         const arrowPaths = this.gameManager.getArrowPaths();
         for (let i = 0; i < arrowPaths.length; i++) {
             const path = arrowPaths[i];
-            console.log(`路径 ${i} 有 ${path.length} 个点:`);
             for (let j = 0; j < path.length; j++) {
                 const point = path[j];
                 if (point && point.x !== null && point.y !== null) {
@@ -86,22 +85,16 @@ export class GameUI extends Component {
             console.log('✓ 点击到路径:', hitPathIdx);
             // 获取路径方向
             const path = this.gameManager.getArrowPaths()[hitPathIdx];
-            if (!path || path.length < 2) {
-                console.log('路径无效');
-                return;
-            }
             const startX = path[1].x;
             const startY = path[1].y;
             const endX = path[0].x;
             const endY = path[0].y;
             // 获取路径方向
             const dir = this.gameManager.getDir(startX, startY, endX, endY);
-
             // 检查路径在箭头方向上是否被其他路径阻挡（递归检查整行/整列）
             if (this.gameManager.isPathBlocked(hitPathIdx, dir)) {
                 return;
             }
-            // 点击到了路径，开始移动
             this.startPathMovement(hitPathIdx);
         } else {
             console.log('未点击到任何路径');
@@ -113,14 +106,17 @@ export class GameUI extends Component {
      */
     private startPathMovement(pathIdx: number): void {
         // 如果路径已经在移动，不重复启动
-        if (this.movingPathIndex === pathIdx) {
+        if (this.movingPathIndices.includes(pathIdx)) {
             return;
         }
-        this.movingPathIndex = pathIdx;
-        this.isMoving = true;
+        // 如果路径已离开地图，不能移动
+        if (this.gameManager.isPathLeftMap(pathIdx)) {
+            return;
+        }
+        // 将路径索引添加到移动数组
+        this.movingPathIndices.push(pathIdx);
     }
-    private movingPathIndex: number = -1; // 当前正在移动的路径索引
-    private isMoving: boolean = false; // 是否正在移动
+    private movingPathIndices: number[] = []; // 当前正在移动的路径索引数组（支持多条路径同时移动）
     /**
      * 初始化Graphics容器
      */
@@ -201,21 +197,46 @@ export class GameUI extends Component {
      * 更新循环 - 处理路径移动
      */
     update(deltaTime: number): void {
-        if (this.isMoving && this.movingPathIndex >= 0) {
-            // 移动路径
-            this.gameManager.arrowPathMove(8, this.movingPathIndex);
-            // 重新绘制当前路径
-            this.drawPath(this.movingPathIndex);
-            // 检查路径是否已离开地图
-            if (this.gameManager.isPathLeftMap(this.movingPathIndex)) {
-                const leftPathIdx = this.movingPathIndex; // 保存路径索引用于日志
-                this.isMoving = false;
-                this.movingPathIndex = -1;
-                console.log(`路径 ${leftPathIdx} 已离开地图，停止移动`);
+        if (this.movingPathIndices.length === 0) {
+            return;
+        }
 
+        // 遍历所有正在移动的路径
+        // 使用倒序遍历，以便安全地移除元素
+        for (let i = this.movingPathIndices.length - 1; i >= 0; i--) {
+            const pathIdx = this.movingPathIndices[i];
+            
+            // 如果路径已离开地图，跳过
+            if (this.gameManager.isPathLeftMap(pathIdx)) {
+                // 从移动数组中移除
+                this.movingPathIndices.splice(i, 1);
+                console.log(`路径 ${pathIdx} 已离开地图，停止移动`);
+                
                 // 隐藏对应的 Graphics
-                this.hidePathGraphics(leftPathIdx);
+                this.hidePathGraphics(pathIdx);
 
+                // 检查是否所有路径都已离开地图
+                if (this.gameManager.areAllPathsLeftMap()) {
+                    console.log('所有路径都已离开地图，通关成功！');
+                }
+                continue;
+            }
+
+            // 移动路径
+            this.gameManager.arrowPathMove(8, pathIdx);
+            // 重新绘制当前路径
+            this.drawPath(pathIdx);
+            
+            // 再次检查路径是否已离开地图（可能在移动后刚刚离开）
+            if (this.gameManager.isPathLeftMap(pathIdx)) {
+                // 从移动数组中移除
+                this.movingPathIndices.splice(i, 1);
+                console.log(`路径 ${pathIdx} 已离开地图，停止移动`);
+                
+                // 隐藏对应的 Graphics
+                this.hidePathGraphics(pathIdx);
+
+                // 检查是否所有路径都已离开地图
                 if (this.gameManager.areAllPathsLeftMap()) {
                     console.log('所有路径都已离开地图，通关成功！');
                 }
