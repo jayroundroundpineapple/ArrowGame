@@ -17,7 +17,8 @@ export class GameManager {
     private roundItemsArr: mapRoundItem[] = []; // 所有圆圈组件数组
     private gameMapNode: Node = null; // 地图父节点
     private mapRoundItemPre: Prefab = null; // 圆圈预制体
-    private roundItemPositions: Map<string, { x: number, y: number }> = new Map(); // 存储每个圆点的坐标，key: "row_col"
+    // 存储每个已激活的圆点坐标，key: "row_col"
+    private roundItemPositions: Map<string, { x: number, y: number }> = new Map(); 
 
     // 箭头路径相关
     private arrowPaths: { x: number, y: number }[][] = []; // 箭头路径数组
@@ -142,6 +143,9 @@ export class GameManager {
         let totalItems = 0;
         let activeItems = 0;
 
+        // 计算中间行的索引，用于Y坐标居中
+        const centerRow = (rows - 1) / 2;
+
         for (let row = 0; row < rows; row++) {
             const countInRow = rowCounts[row];
             
@@ -153,7 +157,8 @@ export class GameManager {
                 const itemNode = instantiate(this.mapRoundItemPre);
 
                 const x = offsetX + col * Macro.mapRoundHorizontalGap;
-                const y = row * Macro.maoRoundVerticalGap;
+                // Y坐标居中：以中间行为0，上下对称分布
+                const y = (row - centerRow) * Macro.maoRoundVerticalGap;
                 itemNode.setPosition(new Vec3(x, y, 0));
                 itemNode.setParent(this.gameMapNode);
                 const mapRoundItemComp = itemNode.getComponent(mapRoundItem);
