@@ -112,9 +112,7 @@ export class GameManager {
                     reject(new Error(`未找到关卡 ${this.currentLevel} 的配置`));
                     return;
                 }
-
                 this.levelData = levelInfo;
-
                 // 根据配置创建地图
                 if (levelInfo.rowCounts && Array.isArray(levelInfo.rowCounts)) {
                     this.createMapRoundItemsWithRowCounts(levelInfo.rows, levelInfo.rowCounts);
@@ -576,25 +574,19 @@ export class GameManager {
             
             // 获取路径的移动方向（从第二个点指向第一个点，即头部方向）
             const dir = this.getDir(path[1].x, path[1].y, path[0].x, path[0].y);
-            
-            // 根据方向判断是否超出边界
             if (dir.x > 0) {
-                // 向右移动：检查X是否超过最大X值
                 if (headX >= Macro.pathLeaveBoundary.maxX) {
                     shouldLeave = true;
                 }
             } else if (dir.x < 0) {
-                // 向左移动：检查X是否小于最小X值
                 if (headX <= Macro.pathLeaveBoundary.minX) {
                     shouldLeave = true;
                 }
             } else if (dir.y > 0) {
-                // 向上移动：检查Y是否超过最大Y值
                 if (headY >= Macro.pathLeaveBoundary.maxY) {
                     shouldLeave = true;
                 }
             } else if (dir.y < 0) {
-                // 向下移动：检查Y是否小于最小Y值
                 if (headY <= Macro.pathLeaveBoundary.minY) {
                     shouldLeave = true;
                 }
@@ -631,7 +623,6 @@ export class GameManager {
             if (!path || path.length < 2) {
                 continue;
             }
-
             // 检查点击位置是否在路径的任意线段上
             for (let i = 0; i < path.length - 1; i++) {
                 const startX = path[i + 1].x;
