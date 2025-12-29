@@ -817,6 +817,8 @@ export class GameManager {
      */
     public setArrowPaths(paths: { x: number, y: number }[][]): void {
         this.arrowPaths = paths.map(path => [...path]);
+        // 初始化 pathLeftMap，确保长度匹配
+        this.pathLeftMap = new Array(paths.length).fill(false);
     }
 
     /**
