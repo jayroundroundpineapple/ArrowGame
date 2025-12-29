@@ -24,6 +24,7 @@ export class GameUI extends Component {
     // private graphicsContainer: Node = null; //Graphics 容器节点
     // 每个路径对应一个 Graphics 组件
     private pathGraphics: Graphics[] = []; // 路径 Graphics 数组
+    private movingPathIndices: number[] = []; // 当前正在移动的路径索引数组
 
     protected onLoad(): void {
         // 初始化游戏管理器
@@ -67,19 +68,21 @@ export class GameUI extends Component {
         console.log('最终使用的坐标（gameMapNode坐标系）:', finalX, finalY);
 
 
-        // 打印所有路径点用于调试
-        const arrowPaths = this.gameManager.getArrowPaths();
-        for (let i = 0; i < arrowPaths.length; i++) {
-            const path = arrowPaths[i];
-            for (let j = 0; j < path.length; j++) {
-                const point = path[j];
-                if (point && point.x !== null && point.y !== null) {
-                    console.log(`点 ${j}: (${point.x}, ${point.y})`);
-                } else {
-                    console.log(`点 ${j}: null或无效`);
-                }
-            }
-        }
+        /**打印所有路径点用于调试 */
+        // const arrowPaths = this.gameManager.getArrowPaths();
+        // for (let i = 0; i < arrowPaths.length; i++) {
+        //     const path = arrowPaths[i];
+        //     for (let j = 0; j < path.length; j++) {
+        //         const point = path[j];
+        //         if (point && point.x !== null && point.y !== null) {
+        //             console.log(`点 ${j}: (${point.x}, ${point.y})`);
+        //         } else {
+        //             console.log(`点 ${j}: null或无效`);
+        //         }
+        //     }
+        // }
+        /**打印所有路径点用于调试 */
+
         const hitPathIdx = this.gameManager.checkPathHit(finalX, finalY, 10);
         if (hitPathIdx >= 0) {
             console.log('✓ 点击到路径:', hitPathIdx);
@@ -113,10 +116,8 @@ export class GameUI extends Component {
         if (this.gameManager.isPathLeftMap(pathIdx)) {
             return;
         }
-        // 将路径索引添加到移动数组
         this.movingPathIndices.push(pathIdx);
     }
-    private movingPathIndices: number[] = []; // 当前正在移动的路径索引数组（支持多条路径同时移动）
     /**
      * 初始化Graphics容器
      */
@@ -202,41 +203,27 @@ export class GameUI extends Component {
         }
 
         // 遍历所有正在移动的路径
-        // 使用倒序遍历，以便安全地移除元素
         for (let i = this.movingPathIndices.length - 1; i >= 0; i--) {
             const pathIdx = this.movingPathIndices[i];
-            
             // 如果路径已离开地图，跳过
             if (this.gameManager.isPathLeftMap(pathIdx)) {
-                // 从移动数组中移除
                 this.movingPathIndices.splice(i, 1);
                 console.log(`路径 ${pathIdx} 已离开地图，停止移动`);
-                
                 // 隐藏对应的 Graphics
                 this.hidePathGraphics(pathIdx);
-
-                // 检查是否所有路径都已离开地图
                 if (this.gameManager.areAllPathsLeftMap()) {
                     console.log('所有路径都已离开地图，通关成功！');
                 }
                 continue;
             }
-
-            // 移动路径
             this.gameManager.arrowPathMove(8, pathIdx);
             // 重新绘制当前路径
             this.drawPath(pathIdx);
-            
             // 再次检查路径是否已离开地图（可能在移动后刚刚离开）
             if (this.gameManager.isPathLeftMap(pathIdx)) {
-                // 从移动数组中移除
                 this.movingPathIndices.splice(i, 1);
                 console.log(`路径 ${pathIdx} 已离开地图，停止移动`);
-                
-                // 隐藏对应的 Graphics
                 this.hidePathGraphics(pathIdx);
-
-                // 检查是否所有路径都已离开地图
                 if (this.gameManager.areAllPathsLeftMap()) {
                     console.log('所有路径都已离开地图，通关成功！');
                 }
