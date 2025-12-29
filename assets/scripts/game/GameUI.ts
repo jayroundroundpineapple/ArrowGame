@@ -2,6 +2,7 @@ import { _decorator, Color, Component, Graphics, Node, Prefab, Vec3, UITransform
 import { Macro } from './Macro';
 import { GameManager } from './GameManager';
 import { GraphicsItem } from './GraphicsItem';
+import { Utils } from '../utils/Utils';
 const { ccclass, property } = _decorator;
 
 /**
@@ -59,6 +60,7 @@ export class GameUI extends Component {
      * 处理路径点击事件
      */
     private onPathTouch(event: EventTouch): void {
+
         let touchWorldPos: Vec2 = event.getUILocation();
         let touchPos = this.gameMapNode.getComponent(UITransformComp).convertToNodeSpaceAR(new Vec3(touchWorldPos.x, touchWorldPos.y, 0));
         console.log('arrowGraphics世界坐标:', touchWorldPos.x, touchWorldPos.y);
@@ -88,6 +90,8 @@ export class GameUI extends Component {
             console.log('✓ 点击到路径:', hitPathIdx);
             // 获取路径方向
             const path = this.gameManager.getArrowPaths()[hitPathIdx];
+            //点击到路径时，看看需不需要做个特效
+            // Utils.setScale(this.pathGraphics[hitPathIdx].node, 1.1);
             const startX = path[1].x;
             const startY = path[1].y;
             const endX = path[0].x;
