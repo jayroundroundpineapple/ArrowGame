@@ -195,7 +195,6 @@ export class GameManager {
                 totalItems++;
             }
         }
-
         console.log(`成功创建 ${rows} 行 × ${maxCols} 列的方形网格，共 ${totalItems} 个格子，激活 ${activeItems} 个`);
         console.log(`每行激活的格子数量: [${rowCounts.join(', ')}]`);
     }
@@ -325,9 +324,8 @@ export class GameManager {
         //     // 为未覆盖的圆圈自动生成路径
         //     this.fillUncoveredCircles(uncoveredCircles, coveredCircles);
         // }
-
-        console.log(`从配置文件加载了 ${this.arrowPaths.length} 条路径`);
-        console.log(`覆盖了 ${coveredCircles.size} 个圆圈，总共 ${allCircles.length} 个圆圈`);
+        // console.log(`从配置文件加载了 ${this.arrowPaths.length} 条路径`);
+        // console.log(`覆盖了 ${coveredCircles.size} 个圆圈，总共 ${allCircles.length} 个圆圈`);
     }
 
     /**

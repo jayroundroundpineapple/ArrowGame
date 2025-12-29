@@ -68,7 +68,6 @@ export class GameUI extends Component {
         
         // 打印所有路径点用于调试
         const arrowPaths = this.gameManager.getArrowPaths();
-        console.log('当前路径数量:', arrowPaths.length);
         for (let i = 0; i < arrowPaths.length; i++) {
             const path = arrowPaths[i];
             console.log(`路径 ${i} 有 ${path.length} 个点:`);
@@ -96,16 +95,13 @@ export class GameUI extends Component {
             const endY = path[0].y;
             // 获取路径方向
             const dir = this.gameManager.getDir(startX, startY, endX, endY);
-            console.log('当前路径方向:', dir);
             
             // 检查路径在箭头方向上是否被其他路径阻挡（递归检查整行/整列）
             if (this.gameManager.isPathBlocked(hitPathIdx, dir)) {
-                console.log('路径被其他路径挡住，无法移动');
                 return;
             }
             // 点击到了路径，开始移动
             this.startPathMovement(hitPathIdx);
-            console.log(`开始移动路径 ${hitPathIdx}`);
         } else {
             console.log('未点击到任何路径');
         }
