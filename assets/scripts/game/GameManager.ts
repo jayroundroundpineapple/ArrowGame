@@ -562,8 +562,51 @@ export class GameManager {
             }
         }
         
-        // 当路径长度 <= 1 时，立即清空路径数组并标记为已离开
-        if (!this.arrowPaths[pathIdx] || this.arrowPaths[pathIdx].length <= 1) {
+        // 检查路径是否已离开地图
+        const path = this.arrowPaths[pathIdx];
+        let shouldLeave = false;
+        
+        if (!path || path.length <= 1) {
+            // 路径长度 <= 1，肯定已离开
+            shouldLeave = true;
+        } else if (path.length === 2) {
+            // 路径长度为2时，根据移动方向检查是否超出边界值
+            const headX = path[0].x;
+            const headY = path[0].y;
+            
+            // 获取路径的移动方向（从第二个点指向第一个点，即头部方向）
+            const dir = this.getDir(path[1].x, path[1].y, path[0].x, path[0].y);
+            
+            // 根据方向判断是否超出边界
+            if (dir.x > 0) {
+                // 向右移动：检查X是否超过最大X值
+                if (headX >= Macro.pathLeaveBoundary.maxX) {
+                    shouldLeave = true;
+                }
+            } else if (dir.x < 0) {
+                // 向左移动：检查X是否小于最小X值
+                if (headX <= Macro.pathLeaveBoundary.minX) {
+                    shouldLeave = true;
+                }
+            } else if (dir.y > 0) {
+                // 向上移动：检查Y是否超过最大Y值
+                if (headY >= Macro.pathLeaveBoundary.maxY) {
+                    shouldLeave = true;
+                }
+            } else if (dir.y < 0) {
+                // 向下移动：检查Y是否小于最小Y值
+                if (headY <= Macro.pathLeaveBoundary.minY) {
+                    shouldLeave = true;
+                }
+            } else {
+                const isHeadOnMap = this.hasRoundItemByPosition(headX, headY);
+                if (!isHeadOnMap) {
+                    shouldLeave = true;
+                }
+            }
+        }
+        
+        if (shouldLeave) {
             console.log(`路径${pathIdx}已经离开地图，清空路径`);
             // 清空路径数组，确保不再绘制任何点
             this.arrowPaths[pathIdx] = [];

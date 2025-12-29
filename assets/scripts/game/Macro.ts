@@ -10,4 +10,12 @@ export class Macro {
 
     public static mapRoundHorizontalGap = 40; //地图圆点横向间距
     public static maoRoundVerticalGap = 40; //地图圆点纵向间距
+    
+    // 路径离开地图的边界值（当路径只剩2个点时使用）
+    public static pathLeaveBoundary = {
+        minX: -1000,  // 向左移动时的最小X值
+        maxX: 1000,   // 向右移动时的最大X值
+        minY: -1500,  // 向下移动时的最小Y值
+        maxY: 1500    // 向上移动时的最大Y值
+    };
 }
