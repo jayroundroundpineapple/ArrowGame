@@ -3,6 +3,17 @@ import { Macro } from './Macro';
 import { mapRoundItem } from './mapRoundItem';
 
 /**
+ * 圆圈信息接口
+ * 包含圆圈的行列索引和坐标信息
+ */
+export interface ICircleInfo {
+    row: number;    // 行索引
+    col: number;    // 列索引
+    x: number;      // X坐标
+    y: number;      // Y坐标
+}
+
+/**
  * 游戏管理器 - 单例模式
  * 负责管理游戏逻辑、关卡数据、地图创建等
  */
@@ -17,8 +28,9 @@ export class GameManager {
     private roundItemsArr: mapRoundItem[] = []; // 所有圆圈组件数组
     private gameMapNode: Node = null; // 地图父节点
     private mapRoundItemPre: Prefab = null; // 圆圈预制体
+    private allCircles: ICircleInfo[][] = []; // 所有地图有效圆圈信息
     // 存储每个已激活的圆点坐标，key: "row_col"
-    private roundItemPositions: Map<string, { x: number, y: number }> = new Map(); 
+    private roundItemPositions: Map<string, { x: number, y: number }> = new Map();
 
     // 箭头路径相关
     private arrowPaths: { x: number, y: number }[][] = []; // 箭头路径数组
@@ -117,7 +129,7 @@ export class GameManager {
                 // 根据配置创建地图
                 if (levelInfo.rowCounts && Array.isArray(levelInfo.rowCounts)) {
                     this.createMapRoundItemsWithRowCounts(levelInfo.rowCounts.length, levelInfo.rowCounts);
-                } 
+                }
                 resolve();
             });
         });
@@ -148,10 +160,10 @@ export class GameManager {
 
         for (let row = 0; row < rows; row++) {
             const countInRow = rowCounts[row];
-            
+
             // 计算当前行的起始X位置（居中）
             const offsetX = -(maxCols - 1) * Macro.mapRoundHorizontalGap / 2;
-            
+
             for (let col = 0; col < maxCols; col++) {
                 //创建N*N格子地图，但是只激活特定格子
                 const itemNode = instantiate(this.mapRoundItemPre);
@@ -169,9 +181,9 @@ export class GameManager {
                     const rightCount = countInRow - leftCount;
                     const startCol = centerCol - leftCount;
                     const endCol = centerCol + rightCount - 1;
-                    
+
                     const isInMap = (col >= startCol && col <= endCol);
-                    
+
                     mapRoundItemComp.initItem(row, col, x, y, isInMap);
                     this.roundItemsArr.push(mapRoundItemComp);
 
@@ -185,6 +197,7 @@ export class GameManager {
                 totalItems++;
             }
         }
+        console.log('jay地图有效圆圈roundItemPositions', this.roundItemPositions)
         console.log(`成功创建 ${rows} 行 × ${maxCols} 列的方形网格，共 ${totalItems} 个格子，激活 ${activeItems} 个`);
         console.log(`每行激活的格子数量: [${rowCounts.join(', ')}]`);
     }
@@ -200,24 +213,26 @@ export class GameManager {
         this.pathLeftMap = []; // 清空离开状态数组
 
         // 获取所有圆圈的行列信息
-        const allCircles: { row: number, col: number, x: number, y: number }[] = [];
         for (const [key, pos] of this.roundItemPositions.entries()) {
             const [row, col] = key.split('_').map(Number);
-            allCircles.push({ row, col, x: pos.x, y: pos.y });
+            if (!this.allCircles[row]) {
+                this.allCircles[row] = [];
+            }
+            this.allCircles[row].push({ row, col, x: pos.x, y: pos.y });
         }
 
-        if (allCircles.length === 0) {
+        if (this.allCircles.length === 0) {
             console.warn('没有找到任何圆圈，无法生成路径');
             return;
         }
 
         // 优先从配置文件中读取路径
         if (this.levelData && this.levelData.arrowPaths && this.levelData.arrowPaths.length) {
-            this.loadArrowPathsFromConfig(this.levelData.arrowPaths, allCircles);
-        } 
+            this.loadArrowPathsFromConfig(this.levelData.arrowPaths, this.allCircles);
+        }
         else {
             // 如果没有配置，自动生成路径
-            this.generateArrowPathsAutomatically(allCircles);
+            this.generateArrowPathsAutomatically(this.allCircles);
         }
     }
 
@@ -228,7 +243,7 @@ export class GameManager {
      */
     private loadArrowPathsFromConfig(
         configPaths: { row: number, col: number }[][],
-        allCircles: { row: number, col: number, x: number, y: number }[]
+        allCircles: ICircleInfo[][]
     ): void {
         const coveredCircles = new Set<string>();
         const invalidPaths: number[] = [];
@@ -236,7 +251,7 @@ export class GameManager {
         // 遍历配置中的每条路径
         for (let pathIdx = 0; pathIdx < configPaths.length; pathIdx++) {
             const configPath = configPaths[pathIdx];
-            
+
             if (!Array.isArray(configPath) || configPath.length < 2) {
                 console.warn(`路径 ${pathIdx} 配置无效，至少需要2个点`);
                 invalidPaths.push(pathIdx);
@@ -305,34 +320,38 @@ export class GameManager {
      * @param allCircles 所有圆圈信息
      */
     private generateArrowPathsAutomatically(
-        allCircles: { row: number, col: number, x: number, y: number }[]
+        allCircles: ICircleInfo[][]
     ): void {
         const coveredCircles = new Set<string>();
 
         // 为每个未覆盖的圆圈生成路径
-        for (const circle of allCircles) {
-            const circleKey = `${circle.row}_${circle.col}`;
-            
-            if (coveredCircles.has(circleKey)) {
-                continue;
-            }
+        console.log('jayjayallCircles初始化所有没有被覆盖的圆圈', allCircles)
+        for (const rowCircles of allCircles) {
+            for (const circle of rowCircles) {
+                const circleKey = `${circle.row}_${circle.col}`;
 
-            const path = this.generatePathFromCircle(circle.row, circle.col, coveredCircles);
+                if (coveredCircles.has(circleKey)) {
+                    continue;
+                }
 
-            if (path && path.length >= 2) {
-                this.arrowPaths.push(path);
-                this.pathLeftMap.push(false);
-                
-                // 标记路径上的所有圆圈为已覆盖
-                for (const point of path) {
-                    for (const [key, pos] of this.roundItemPositions.entries()) {
-                        if (Math.abs(pos.x - point.x) < 0.1 && Math.abs(pos.y - point.y) < 0.1) {
-                            coveredCircles.add(key);
-                            break;
+                const path = this.generatePathFromCircle(circle.row, circle.col, coveredCircles);
+
+                if (path && path.length >= 2) {
+                    this.arrowPaths.push(path);
+                    this.pathLeftMap.push(false);
+
+                    // 标记路径上的所有圆圈为已覆盖
+                    for (const point of path) {
+                        for (const [key, pos] of this.roundItemPositions.entries()) {
+                            if (Math.abs(pos.x - point.x) < 0.1 && Math.abs(pos.y - point.y) < 0.1) {
+                                coveredCircles.add(key);
+                                break;
+                            }
                         }
                     }
                 }
             }
+            console.log("jay已经被路线覆盖的地图圆圈", coveredCircles)
         }
     }
 
@@ -344,17 +363,16 @@ export class GameManager {
      * @returns 生成的路径点数组（反向存储：从尾部到头部）
      */
     private generatePathFromCircle(
-        startRow: number, 
-        startCol: number, 
-        coveredCircles: Set<string>
-    ): { x: number, y: number }[] | null {
+            startRow: number,
+            startCol: number,
+            coveredCircles: Set<string>
+        ): { x: number, y: number }[] | null {
         const path: { x: number, y: number }[] = [];
         const visited = new Set<string>();
-        
         let currentRow = startRow;
         let currentCol = startCol;
         const startKey = `${currentRow}_${currentCol}`;
-        
+
         // 检查起始点是否存在
         const startPos = this.getRoundItemPosition(currentRow, currentCol);
         if (!startPos) {
@@ -404,22 +422,25 @@ export class GameManager {
         // 路径需要反向存储（从尾部到头部），因为绘制时是从尾部到头部
         return path.reverse();
     }
+    /**重新排序allCircles 从中间往外遍历 */
+    private reSortAllCircles(allCircles: ICircleInfo[]) {
 
-     	// 第14行              0 1 
-        // 第13行            0 1 2 3 
-        // 第12行          0 1 2 3 4 5
-        // 第11行        0 1 2 3 4 5 6 07
-        // 第10行      0 1 2 3 4 5 6 7 08 09
-        // 第9行     0 1 2 3 4 5 6 7 8 09 10 11
-        // 第8行   0 1 2 3 4 5 6 7 8 09 10 11 12 13
-        // 第7行 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
-        // 第6行   0 1 2 3 4 5 6 7 8 09 10 11 12 13
-        // 第5行     0 1 2 3 4 5 6 7 08 09 10 11
-        // 第4行       0 1 2 3 4 5 6 07 08 09
-        // 第3行         0 1 2 3 4 5 06 08
-        // 第2行           0 1 2 3 4 05
-        // 第1行             0 1 2 3 
-        // 第0行               0 1 
+    }
+    // 第14行              0 1 
+    // 第13行            0 1 2 3 
+    // 第12行          0 1 2 3 4 5
+    // 第11行        0 1 2 3 4 5 6 07
+    // 第10行      0 1 2 3 4 5 6 7 08 09
+    // 第9行     0 1 2 3 4 5 6 7 8 09 10 11
+    // 第8行   0 1 2 3 4 5 6 7 8 09 10 11 12 13
+    // 第7行 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+    // 第6行   0 1 2 3 4 5 6 7 8 09 10 11 12 13
+    // 第5行     0 1 2 3 4 5 6 7 08 09 10 11
+    // 第4行       0 1 2 3 4 5 6 07 08 09
+    // 第3行         0 1 2 3 4 5 06 08
+    // 第2行           0 1 2 3 4 05
+    // 第1行             0 1 2 3 
+    // 第0行               0 1 
     /**
      * 根据行列查找相邻的圆圈（上下左右方向）
      * @param row 当前行
@@ -428,7 +449,7 @@ export class GameManager {
      */
     private findAdjacentCirclesByRowCol(row: number, col: number): { row: number, col: number }[] {
         const adjacent: { row: number, col: number }[] = [];
-        
+
         // 方形网格布局：直接通过row±1, col±1查找相邻格子
         const directions = [
             { row: row + 1, col: col },     // 上
@@ -494,14 +515,14 @@ export class GameManager {
         // 检查路径是否已离开地图
         const path = this.arrowPaths[pathIdx];
         let shouldLeave = false;
-        
+
         if (!path || path.length <= 1) {
             shouldLeave = true;
         } else if (path.length === 2) {
             // 路径长度为2时，根据移动方向检查是否超出边界值
             const headX = path[0].x;
             const headY = path[0].y;
-            
+
             // 获取路径的移动方向（从第二个点指向第一个点，即头部方向）
             const dir = this.getDir(path[1].x, path[1].y, path[0].x, path[0].y);
             if (dir.x > 0) {
@@ -527,7 +548,7 @@ export class GameManager {
                 }
             }
         }
-        
+
         if (shouldLeave) {
             console.log(`路径${pathIdx}已经离开地图，清空路径`);
             // 清空路径数组，确保不再绘制任何点
@@ -563,7 +584,7 @@ export class GameManager {
                 // 计算点到线段的距离
                 const distance = this.pointToLineDistance(x, y, startX, startY, endX, endY);
                 if (distance <= hitDistance) {
-                    return pathIdx; 
+                    return pathIdx;
                 }
             }
         }
@@ -763,8 +784,8 @@ export class GameManager {
             }
 
             // 如果还是地图圆圈，检查这个位置是否有其他路径（除了当前路径）
-            const BlockedPathIdx = this.checkPathHit(checkX,checkY,5)
-            if(BlockedPathIdx >= 0 && BlockedPathIdx !== pathIdx && !this.pathLeftMap[BlockedPathIdx]){
+            const BlockedPathIdx = this.checkPathHit(checkX, checkY, 5)
+            if (BlockedPathIdx >= 0 && BlockedPathIdx !== pathIdx && !this.pathLeftMap[BlockedPathIdx]) {
                 console.log(`被路径 ${BlockedPathIdx} 阻挡`);
                 return true;
             }
