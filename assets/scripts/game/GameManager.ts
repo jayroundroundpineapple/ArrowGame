@@ -629,7 +629,16 @@ export class GameManager {
         }
         return -1; // 没有点击到任何路径
     }
-
+    /**方向在同一行或者同一列是否面对面有冲突 */
+    private arrowDirIsConflict(dir1: { x: number, y: number }, dir2: { x: number, y: number }): boolean {
+        if (dir1.x * dir2.x == -1) {
+            return true;
+        }
+        if (dir1.y * dir2.y == -1) {
+            return true;
+        }
+        return false;
+    }
     /**
      * 计算点到线段的距离
      * @param px 点X坐标
