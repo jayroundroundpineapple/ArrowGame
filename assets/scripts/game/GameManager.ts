@@ -509,8 +509,8 @@ export class GameManager {
 
         // 尝试延伸路径，优先连接未覆盖的节点
         // 路径长度范围：3-7个圆圈，但优先确保覆盖未覆盖的节点
-        const minLength = 3;
-        const maxLength = 7;
+        const minLength = Utils.getRandomInt(2, 3);
+        const maxLength = Utils.getRandomInt(4, 7);
 
         while (path.length < maxLength) {
             // 查找当前点的相邻圆圈（上下左右方向）
