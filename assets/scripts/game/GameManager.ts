@@ -1,6 +1,7 @@
-import { JsonAsset, Prefab, resources, instantiate, Vec3, Node } from 'cc';
+import { JsonAsset, Prefab, resources, instantiate, Vec3, Node, utils } from 'cc';
 import { Macro } from './Macro';
 import { mapRoundItem } from './mapRoundItem';
+import { Utils } from '../utils/Utils';
 
 /**
  * 圆圈信息接口
@@ -360,7 +361,7 @@ export class GameManager {
             }
         }
 
-        // 4. 验证所有节点是否都被覆盖
+        // 验证所有节点是否都被覆盖
         this.validateAllCirclesCovered(allCircles, coveredCircles);
         console.log(`路径生成完成，共生成 ${this.arrowPaths.length} 条路径，覆盖 ${coveredCircles.size} 个节点`);
     }
@@ -515,28 +516,25 @@ export class GameManager {
             // 查找当前点的相邻圆圈（上下左右方向）
             const adjacentCircles = this.findAdjacentCirclesByRowCol(currentRow, currentCol);
 
-            // 分离未覆盖和已覆盖的相邻节点
+            // 未覆盖的相邻节点和已覆盖的相邻节点
             const uncoveredCircles: { row: number, col: number }[] = [];
-            const coveredAdjacentCircles: { row: number, col: number }[] = [];
 
             for (const circle of adjacentCircles) {
                 const circleKey = `${circle.row}_${circle.col}`;
                 if (visited.has(circleKey)) {
-                    continue; // 跳过已访问的节点
+                    continue; 
                 }
                 if (coveredCircles.has(circleKey)) {
-                    coveredAdjacentCircles.push(circle);
+                    continue; 
                 } else {
                     uncoveredCircles.push(circle);
                 }
             }
-
-            // 优先选择未覆盖的节点
             let nextCircle: { row: number, col: number } | null = null;
 
             if (uncoveredCircles.length > 0) {
                 // 如果有未覆盖的节点，优先选择（随机选择以增加路径多样性）
-                nextCircle = uncoveredCircles[Math.floor(Math.random() * uncoveredCircles.length)];
+                nextCircle = uncoveredCircles[Utils.getRandomInt(0, uncoveredCircles.length - 1)];
             } else {
                 // 没有可用的相邻圆圈，停止延伸
                 break;
