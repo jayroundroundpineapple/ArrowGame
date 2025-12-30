@@ -510,7 +510,6 @@ export class GameManager {
         // 路径长度范围：3-7个圆圈，但优先确保覆盖未覆盖的节点
         const minLength = 3;
         const maxLength = 7;
-        let consecutiveCoveredCount = 0; // 连续遇到已覆盖节点的次数
 
         while (path.length < maxLength) {
             // 查找当前点的相邻圆圈（上下左右方向）
@@ -538,7 +537,6 @@ export class GameManager {
             if (uncoveredCircles.length > 0) {
                 // 如果有未覆盖的节点，优先选择（随机选择以增加路径多样性）
                 nextCircle = uncoveredCircles[Math.floor(Math.random() * uncoveredCircles.length)];
-                consecutiveCoveredCount = 0; // 重置计数
             } else {
                 // 没有可用的相邻圆圈，停止延伸
                 break;
