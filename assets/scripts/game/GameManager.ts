@@ -35,6 +35,8 @@ export class GameManager {
     // 箭头路径相关
     private arrowPaths: { x: number, y: number }[][] = []; // 箭头路径数组
     private pathLeftMap: boolean[] = []; // 记录每条路径是否已离开地图，true表示已离开
+    // 记录每条路径的头部位置和方向，用于检查是否面对面
+    private pathHeadInfo: { row: number, col: number, dir: { x: number, y: number } }[] = [];
 
     private constructor() {
         // 私有构造函数，防止外部实例化
@@ -211,6 +213,8 @@ export class GameManager {
         // 清空之前的路径
         this.arrowPaths = [];
         this.pathLeftMap = []; // 清空离开状态数组
+        this.pathHeadInfo = []; // 清空路径头部信息
+        this.allCircles = []; // 清空圆圈数组
 
         // 获取所有圆圈的行列信息
         for (const [key, pos] of this.roundItemPositions.entries()) {
@@ -317,56 +321,176 @@ export class GameManager {
     }
     /**
      * 自动生成箭头路径（当配置文件中没有路径配置时使用）
-     * @param allCircles 所有圆圈信息
+     * 使用BFS从中心向外遍历，确保所有节点都被覆盖
+     * @param allCircles 所有圆圈信息（二维数组，按行组织）
      */
     private generateArrowPathsAutomatically(
         allCircles: ICircleInfo[][]
     ): void {
         const coveredCircles = new Set<string>();
-
-        // 为每个未覆盖的圆圈生成路径
-        console.log('jayjayallCircles初始化所有没有被覆盖的圆圈', allCircles)
-        for (const rowCircles of allCircles) {
-            for (const circle of rowCircles) {
-                const circleKey = `${circle.row}_${circle.col}`;
-
-                if (coveredCircles.has(circleKey)) {
-                    continue;
-                }
-
-                const path = this.generatePathFromCircle(circle.row, circle.col, coveredCircles);
-
-                if (path && path.length >= 2) {
-                    this.arrowPaths.push(path);
-                    this.pathLeftMap.push(false);
-
-                    // 标记路径上的所有圆圈为已覆盖
-                    for (const point of path) {
-                        for (const [key, pos] of this.roundItemPositions.entries()) {
-                            if (Math.abs(pos.x - point.x) < 0.1 && Math.abs(pos.y - point.y) < 0.1) {
-                                coveredCircles.add(key);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            console.log("jay已经被路线覆盖的地图圆圈", coveredCircles)
+        
+        // 1. 找到中心节点（最接近地图中心的节点）
+        const centerCircle = this.findCenterCircle(allCircles);
+        if (!centerCircle) {
+            console.warn('无法找到中心节点');
+            return;
         }
+
+        // 2. 使用BFS从中心开始，按距离排序所有节点
+        const sortedCircles = this.bfsFromCenter(centerCircle, allCircles);
+        console.log(`从中心节点 (${centerCircle.row}, ${centerCircle.col}) 开始，共找到 ${sortedCircles.length} 个节点`);
+
+        // 3. 按距离从近到远遍历，为每个未覆盖的节点生成路径
+        for (const circle of sortedCircles) {
+            const circleKey = `${circle.row}_${circle.col}`;
+
+            if (coveredCircles.has(circleKey)) {
+                continue;
+            }
+
+            // 尝试生成路径，优先连接未覆盖的相邻节点
+            const path = this.generatePathFromCircleOptimized(circle.row, circle.col, coveredCircles);
+
+            if (path && path.length >= 2) {
+                this.arrowPaths.push(path);
+                this.pathLeftMap.push(false);
+
+                // 标记路径上的所有圆圈为已覆盖
+                this.markPathAsCovered(path, coveredCircles);
+            }
+        }
+
+        // 4. 验证所有节点是否都被覆盖
+        this.validateAllCirclesCovered(allCircles, coveredCircles);
+        console.log(`路径生成完成，共生成 ${this.arrowPaths.length} 条路径，覆盖 ${coveredCircles.size} 个节点`);
     }
 
     /**
-     * 从指定圆圈生成一条路径（只能上下左右方向）
+     * 找到最接近地图中心的节点
+     * @param allCircles 所有圆圈信息
+     * @returns 中心节点，如果不存在则返回null
+     */
+    private findCenterCircle(allCircles: ICircleInfo[][]): ICircleInfo | null {
+        if (allCircles.length === 0) {
+            return null;
+        }
+
+        // 计算所有节点的平均位置（中心点）
+        let totalX = 0;
+        let totalY = 0;
+        let count = 0;
+
+        for (const rowCircles of allCircles) {
+            for (const circle of rowCircles) {
+                totalX += circle.x;
+                totalY += circle.y;
+                count++;
+            }
+        }
+
+        if (count === 0) {
+            return null;
+        }
+
+        const centerX = totalX / count;
+        const centerY = totalY / count;
+
+        // 找到距离中心最近的节点
+        let minDistance = Infinity;
+        let centerCircle: ICircleInfo | null = null;
+
+        for (const rowCircles of allCircles) {
+            for (const circle of rowCircles) {
+                const distance = Math.sqrt(
+                    Math.pow(circle.x - centerX, 2) + Math.pow(circle.y - centerY, 2)
+                );
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    centerCircle = circle;
+                }
+            }
+        }
+
+        return centerCircle;
+    }
+
+    /**
+     * 使用BFS从中心节点开始遍历，返回按距离排序的所有节点
+     * @param centerCircle 中心节点
+     * @param allCircles 所有圆圈信息
+     * @returns 按距离从近到远排序的节点数组
+     */
+    private bfsFromCenter(
+        centerCircle: ICircleInfo,
+        allCircles: ICircleInfo[][]
+    ): ICircleInfo[] {
+        const visited = new Set<string>();
+        const queue: { circle: ICircleInfo, distance: number }[] = [];
+        const result: ICircleInfo[] = [];
+
+        // 将中心节点加入队列
+        const centerKey = `${centerCircle.row}_${centerCircle.col}`;
+        queue.push({ circle: centerCircle, distance: 0 });
+        visited.add(centerKey);
+
+        // BFS遍历
+        while (queue.length > 0) {
+            const { circle, distance } = queue.shift()!;
+            result.push(circle);
+
+            // 查找相邻节点
+            const adjacentCircles = this.findAdjacentCirclesByRowCol(circle.row, circle.col);
+
+            for (const adj of adjacentCircles) {
+                const adjKey = `${adj.row}_${adj.col}`;
+                if (!visited.has(adjKey)) {
+                    visited.add(adjKey);
+                    // 找到对应的完整节点信息
+                    const adjCircle = this.getCircleByRowCol(adj.row, adj.col, allCircles);
+                    if (adjCircle) {
+                        queue.push({ circle: adjCircle, distance: distance + 1 });
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * 根据行列获取圆圈信息
+     * @param row 行索引
+     * @param col 列索引
+     * @param allCircles 所有圆圈信息
+     * @returns 圆圈信息，如果不存在则返回null
+     */
+    private getCircleByRowCol(
+        row: number,
+        col: number,
+        allCircles: ICircleInfo[][]
+    ): ICircleInfo | null {
+        if (allCircles[row]) {
+            for (const circle of allCircles[row]) {
+                if (circle.row === row && circle.col === col) {
+                    return circle;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 从指定圆圈生成一条路径（优化版，优先连接未覆盖的相邻节点）
      * @param startRow 起始行
      * @param startCol 起始列
      * @param coveredCircles 已覆盖的圆圈集合
      * @returns 生成的路径点数组（反向存储：从尾部到头部）
      */
-    private generatePathFromCircle(
-            startRow: number,
-            startCol: number,
-            coveredCircles: Set<string>
-        ): { x: number, y: number }[] | null {
+    private generatePathFromCircleOptimized(
+        startRow: number,
+        startCol: number,
+        coveredCircles: Set<string>
+    ): { x: number, y: number }[] | null {
         const path: { x: number, y: number }[] = [];
         const visited = new Set<string>();
         let currentRow = startRow;
@@ -382,34 +506,62 @@ export class GameManager {
         path.push({ x: startPos.x, y: startPos.y });
         visited.add(startKey);
 
-        // 尝试延伸路径，最多连接3-7个圆圈
-        const maxLength = 3 + Math.floor(Math.random() * 5); // 3-7个圆圈
+        // 尝试延伸路径，优先连接未覆盖的节点
+        // 路径长度范围：3-7个圆圈，但优先确保覆盖未覆盖的节点
+        const minLength = 3;
+        const maxLength = 7;
+        let consecutiveCoveredCount = 0; // 连续遇到已覆盖节点的次数
 
         while (path.length < maxLength) {
             // 查找当前点的相邻圆圈（上下左右方向）
             const adjacentCircles = this.findAdjacentCirclesByRowCol(currentRow, currentCol);
 
-            // 过滤掉已访问和已覆盖的圆圈
-            const availableCircles = adjacentCircles.filter(circle => {
-                const circleKey = `${circle.row}_${circle.col}`;
-                return !visited.has(circleKey) && !coveredCircles.has(circleKey);
-            });
+            // 分离未覆盖和已覆盖的相邻节点
+            const uncoveredCircles: { row: number, col: number }[] = [];
+            const coveredAdjacentCircles: { row: number, col: number }[] = [];
 
-            if (availableCircles.length === 0) {
-                break; // 没有可用的相邻圆圈，停止延伸
+            for (const circle of adjacentCircles) {
+                const circleKey = `${circle.row}_${circle.col}`;
+                if (visited.has(circleKey)) {
+                    continue; // 跳过已访问的节点
+                }
+                if (coveredCircles.has(circleKey)) {
+                    coveredAdjacentCircles.push(circle);
+                } else {
+                    uncoveredCircles.push(circle);
+                }
             }
 
-            // 随机选择一个相邻圆圈
-            const nextCircle = availableCircles[Math.floor(Math.random() * availableCircles.length)];
-            const nextKey = `${nextCircle.row}_${nextCircle.col}`;
-            const nextPos = this.getRoundItemPosition(nextCircle.row, nextCircle.col);
+            // 优先选择未覆盖的节点
+            let nextCircle: { row: number, col: number } | null = null;
 
-            if (nextPos) {
-                path.push({ x: nextPos.x, y: nextPos.y });
-                visited.add(nextKey);
-                currentRow = nextCircle.row;
-                currentCol = nextCircle.col;
+            if (uncoveredCircles.length > 0) {
+                // 如果有未覆盖的节点，优先选择（随机选择以增加路径多样性）
+                nextCircle = uncoveredCircles[Math.floor(Math.random() * uncoveredCircles.length)];
+                consecutiveCoveredCount = 0; // 重置计数
             } else {
+                // 没有可用的相邻圆圈，停止延伸
+                break;
+            }
+
+            if (nextCircle) {
+                const nextKey = `${nextCircle.row}_${nextCircle.col}`;
+                const nextPos = this.getRoundItemPosition(nextCircle.row, nextCircle.col);
+
+                if (nextPos) {
+                    path.push({ x: nextPos.x, y: nextPos.y });
+                    visited.add(nextKey);
+                    currentRow = nextCircle.row;
+                    currentCol = nextCircle.col;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+
+            // 如果路径长度达到最小值且没有未覆盖的相邻节点，可以提前结束
+            if (path.length >= minLength && uncoveredCircles.length === 0) {
                 break;
             }
         }
@@ -422,25 +574,55 @@ export class GameManager {
         // 路径需要反向存储（从尾部到头部），因为绘制时是从尾部到头部
         return path.reverse();
     }
-    /**重新排序allCircles 从中间往外遍历 */
-    private reSortAllCircles(allCircles: ICircleInfo[]) {
 
+    /**
+     * 标记路径上的所有圆圈为已覆盖
+     * @param path 路径点数组
+     * @param coveredCircles 已覆盖的圆圈集合
+     */
+    private markPathAsCovered(
+        path: { x: number, y: number }[],
+        coveredCircles: Set<string>
+    ): void {
+        for (const point of path) {
+            for (const [key, pos] of this.roundItemPositions.entries()) {
+                if (Math.abs(pos.x - point.x) < 0.1 && Math.abs(pos.y - point.y) < 0.1) {
+                    coveredCircles.add(key);
+                    break;
+                }
+            }
+        }
     }
-    // 第14行              0 1 
-    // 第13行            0 1 2 3 
-    // 第12行          0 1 2 3 4 5
-    // 第11行        0 1 2 3 4 5 6 07
-    // 第10行      0 1 2 3 4 5 6 7 08 09
-    // 第9行     0 1 2 3 4 5 6 7 8 09 10 11
-    // 第8行   0 1 2 3 4 5 6 7 8 09 10 11 12 13
-    // 第7行 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
-    // 第6行   0 1 2 3 4 5 6 7 8 09 10 11 12 13
-    // 第5行     0 1 2 3 4 5 6 7 08 09 10 11
-    // 第4行       0 1 2 3 4 5 6 07 08 09
-    // 第3行         0 1 2 3 4 5 06 08
-    // 第2行           0 1 2 3 4 05
-    // 第1行             0 1 2 3 
-    // 第0行               0 1 
+
+    /**
+     * 验证所有圆圈是否都被路径覆盖
+     * @param allCircles 所有圆圈信息
+     * @param coveredCircles 已覆盖的圆圈集合
+     */
+    private validateAllCirclesCovered(
+        allCircles: ICircleInfo[][],
+        coveredCircles: Set<string>
+    ): void {
+        const uncoveredCircles: ICircleInfo[] = [];
+
+        for (const rowCircles of allCircles) {
+            for (const circle of rowCircles) {
+                const circleKey = `${circle.row}_${circle.col}`;
+                if (!coveredCircles.has(circleKey)) {
+                    uncoveredCircles.push(circle);
+                }
+            }
+        }
+
+        if (uncoveredCircles.length > 0) {
+            console.warn(`警告：有 ${uncoveredCircles.length} 个圆圈未被路径覆盖：`);
+            for (const circle of uncoveredCircles) {
+                console.warn(`  未覆盖节点: (${circle.row}, ${circle.col})`);
+            }
+        } else {
+            console.log('✓ 所有圆圈都已被路径覆盖');
+        }
+    }
     /**
      * 根据行列查找相邻的圆圈（上下左右方向）
      * @param row 当前行
