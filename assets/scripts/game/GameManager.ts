@@ -175,6 +175,10 @@ export class GameManager {
         for (let row = 0; row < rows; row++) {
             const rowData = pathMatrix[row] || [];
             
+            // 反转行索引：矩阵的第一行（row=0）对应地图的顶部（实际行索引=rows-1）
+            // 这样配置时，矩阵的第一行就是地图的顶部，更直观
+            const actualRow = rows - 1 - row;
+            
             // 计算当前行的起始X位置（居中）
             const offsetX = -(maxCols - 1) * Macro.mapRoundHorizontalGap / 2;
 
@@ -184,7 +188,8 @@ export class GameManager {
 
                 const x = offsetX + col * Macro.mapRoundHorizontalGap;
                 // Y坐标居中：以中间行为0，上下对称分布
-                const y = (row - centerRow) * Macro.maoRoundVerticalGap;
+                // 使用 actualRow 来计算Y坐标，使矩阵第一行对应地图顶部
+                const y = (actualRow - centerRow) * Macro.maoRoundVerticalGap;
                 itemNode.setPosition(new Vec3(x, y, 0));
                 itemNode.setParent(this.gameMapNode);
                 const mapRoundItemComp = itemNode.getComponent(mapRoundItem);
@@ -193,10 +198,11 @@ export class GameManager {
                     const pathId = rowData[col];
                     const isInMap = (pathId !== undefined && pathId !== null && pathId !== 0);
 
+                    // 存储时仍然使用矩阵的原始行列索引（row, col），因为路径加载逻辑使用的是矩阵索引
                     mapRoundItemComp.initItem(row, col, x, y, isInMap);
                     this.roundItemsArr.push(mapRoundItemComp);
 
-                    // 只记录激活的格子坐标
+                    // 只记录激活的格子坐标，key使用矩阵的原始行列索引
                     if (isInMap) {
                         const key = `${row}_${col}`;
                         this.roundItemPositions.set(key, { x, y });
